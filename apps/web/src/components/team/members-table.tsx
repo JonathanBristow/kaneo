@@ -56,6 +56,11 @@ type Props = {
   workspaceId: string;
   invitations: WorkspaceUserInvitation[];
   users: WorkspaceUser[];
+  // better-auth's organization plugin hard-codes {id,name,email,image} for
+  // the joined `user` object on every member-listing endpoint, so `isAgent`
+  // never reaches `users` here regardless of the schema column existing.
+  // The agent badge instead cross-references this id set from GET /agent.
+  agentUserIds?: Set<string>;
 };
 
 // Stable per-user pastel for the avatar fallback. Picks one of a curated set
@@ -90,7 +95,12 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function MembersTable({ workspaceId, invitations, users }: Props) {
+function MembersTable({
+  workspaceId,
+  invitations,
+  users,
+  agentUserIds,
+}: Props) {
   const { t } = useTranslation();
   const [memberToDelete, setMemberToDelete] = useState<WorkspaceUser | null>(
     null,
@@ -205,6 +215,7 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
         <TableBody>
           {sortedUsers.map((member) => {
             const isSelf = currentUser?.id === member.userId;
+            const isAgent = agentUserIds?.has(member.userId) ?? false;
             const showRoleSelect =
               canChangeRoles && !isSelf && member.role !== "owner";
             const tone = toneFor(member.user.email);
@@ -226,6 +237,17 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
                         <span className="text-sm font-medium">
                           {member.user.name}
                         </span>
+                        {isAgent ? (
+                          <Badge
+                            variant="outline"
+                            size="sm"
+                            className="font-mono text-[9px] uppercase tracking-wider"
+                          >
+                            {t("team:members.agentBadge", {
+                              defaultValue: "agent",
+                            })}
+                          </Badge>
+                        ) : null}
                         {isSelf ? (
                           <span className="text-xs text-muted-foreground">
                             ({t("team:members.you", { defaultValue: "You" })})

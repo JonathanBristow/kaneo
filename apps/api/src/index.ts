@@ -14,6 +14,7 @@ import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import activity from "./activity";
+import agent from "./agent";
 import { auth } from "./auth";
 import { organizationRoutes } from "./auth-openapi";
 import billing from "./billing";
@@ -609,6 +610,7 @@ export function createApp() {
   const invitationApi = api.route("/invitation", invitation);
   const workspaceApi = api.route("/workspace", workspace);
   const userApi = api.route("/user", user);
+  const agentApi = api.route("/agent", agent);
 
   app.route(
     "/",
@@ -749,6 +751,7 @@ export function createApp() {
     api,
     injectWebSocket,
     activityApi,
+    agentApi,
     billingApi,
     columnApi,
     commentApi,
@@ -867,6 +870,7 @@ const {
   app,
   injectWebSocket,
   activityApi,
+  agentApi,
   billingApi,
   columnApi,
   commentApi,
@@ -907,6 +911,7 @@ if (isMainModule) {
 
 export type AppType =
   | typeof billingApi
+  | typeof agentApi
   | typeof configApi
   | typeof projectApi
   | typeof taskApi

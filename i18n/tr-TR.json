@@ -2074,7 +2074,9 @@
 		"members": {
 			"pageTitle": "Üyeler",
 			"inviteMember": "Üye davet et",
-			"you": "Siz"
+			"you": "Siz",
+			"addAgent": "Add agent",
+			"agentBadge": "agent"
 		},
 		"invitations": {
 			"linkLabel": "Davet bağlantısı",
@@ -2120,6 +2122,25 @@
 			"roleUpdateSuccess": "Rol güncellendi",
 			"roleUpdateError": "Rol güncellenemedi",
 			"ariaInvitationActions": "Davet işlemleri"
+		},
+		"addAgentModal": {
+			"alertDescription": "This key will not be shown again. If you lose it, revoke this agent and create a new one.",
+			"alertTitle": "Store this key securely",
+			"apiKeyLabel": "API key",
+			"copied": "Copied",
+			"copy": "Copy",
+			"copyToContinue": "Copy the key to continue",
+			"create": "Create Agent",
+			"createdDescription": "{{name}} was added to the workspace. Copy its API key now — it will not be shown again.",
+			"createdTitle": "Agent created",
+			"creating": "Creating...",
+			"done": "Done",
+			"error": "Failed to create agent",
+			"nameLabel": "Name",
+			"namePlaceholder": "Release Bot",
+			"roleLabel": "Role",
+			"title": "Add Agent",
+			"toastCopied": "API key copied"
 		}
 	},
 	"publicProject": {

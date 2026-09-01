@@ -162,3 +162,58 @@ describe("MembersTable pending invitation row menu", () => {
     ).toBeNull();
   });
 });
+
+describe("MembersTable agent badge", () => {
+  const agentMember = {
+    id: "member-agent-1",
+    userId: "user-agent-1",
+    role: "member",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    user: {
+      id: "user-agent-1",
+      name: "Release Bot",
+      email: "agent-release-bot@agents.invalid",
+      image: null,
+    },
+  } as unknown as WorkspaceUser;
+
+  const humanMember = {
+    id: "member-human-1",
+    userId: "user-human-1",
+    role: "member",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    user: {
+      id: "user-human-1",
+      name: "Jane Human",
+      email: "jane@example.com",
+      image: null,
+    },
+  } as unknown as WorkspaceUser;
+
+  it("shows the agent badge only for member ids present in agentUserIds", () => {
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[agentMember, humanMember]}
+        agentUserIds={new Set(["user-agent-1"])}
+      />,
+    );
+
+    expect(screen.getAllByText("team:members.agentBadge")).toHaveLength(1);
+    expect(screen.getByText("Release Bot")).toBeVisible();
+    expect(screen.getByText("Jane Human")).toBeVisible();
+  });
+
+  it("shows no agent badge when agentUserIds is omitted", () => {
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[agentMember, humanMember]}
+      />,
+    );
+
+    expect(screen.queryByText("team:members.agentBadge")).toBeNull();
+  });
+});

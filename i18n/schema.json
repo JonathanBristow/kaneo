@@ -8589,11 +8589,23 @@
 						"inviteMember": {
 							"type": "string"
 						},
+						"addAgent": {
+							"type": "string"
+						},
+						"agentBadge": {
+							"type": "string"
+						},
 						"you": {
 							"type": "string"
 						}
 					},
-					"required": ["pageTitle", "inviteMember", "you"]
+					"required": [
+						"pageTitle",
+						"inviteMember",
+						"addAgent",
+						"agentBadge",
+						"you"
+					]
 				},
 				"invitations": {
 					"type": "object",
@@ -8770,6 +8782,82 @@
 						"roleUpdateSuccess",
 						"roleUpdateError"
 					]
+				},
+				"addAgentModal": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"title": {
+							"type": "string"
+						},
+						"nameLabel": {
+							"type": "string"
+						},
+						"namePlaceholder": {
+							"type": "string"
+						},
+						"roleLabel": {
+							"type": "string"
+						},
+						"create": {
+							"type": "string"
+						},
+						"creating": {
+							"type": "string"
+						},
+						"error": {
+							"type": "string"
+						},
+						"createdTitle": {
+							"type": "string"
+						},
+						"createdDescription": {
+							"type": "string"
+						},
+						"apiKeyLabel": {
+							"type": "string"
+						},
+						"copy": {
+							"type": "string"
+						},
+						"copied": {
+							"type": "string"
+						},
+						"toastCopied": {
+							"type": "string"
+						},
+						"alertTitle": {
+							"type": "string"
+						},
+						"alertDescription": {
+							"type": "string"
+						},
+						"done": {
+							"type": "string"
+						},
+						"copyToContinue": {
+							"type": "string"
+						}
+					},
+					"required": [
+						"title",
+						"nameLabel",
+						"namePlaceholder",
+						"roleLabel",
+						"create",
+						"creating",
+						"error",
+						"createdTitle",
+						"createdDescription",
+						"apiKeyLabel",
+						"copy",
+						"copied",
+						"toastCopied",
+						"alertTitle",
+						"alertDescription",
+						"done",
+						"copyToContinue"
+					]
 				}
 			},
 			"required": [
@@ -8777,7 +8865,8 @@
 				"members",
 				"invitations",
 				"inviteModal",
-				"membersTable"
+				"membersTable",
+				"addAgentModal"
 			]
 		},
 		"publicProject": {
