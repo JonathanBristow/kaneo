@@ -43,6 +43,12 @@ vi.mock("@/hooks/mutations/workspace-user/use-delete-workspace-user", () => ({
   default: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
+const deleteAgentMutateAsync = vi.fn();
+
+vi.mock("@/hooks/mutations/agent/use-delete-agent", () => ({
+  default: () => ({ mutateAsync: deleteAgentMutateAsync, isPending: false }),
+}));
+
 vi.mock(
   "@/hooks/mutations/workspace-user/use-update-workspace-user-role",
   () => ({
@@ -55,12 +61,14 @@ vi.mock("@/hooks/queries/workspace/use-workspace-roles", () => ({
 }));
 
 const canInviteUsers = vi.fn(() => true);
+const canManageWorkspace = vi.fn(() => true);
 
 vi.mock("@/hooks/use-workspace-permission", () => ({
   useWorkspacePermission: () => ({
     canManageTeam: () => true,
     canRemoveMembers: () => true,
     canInviteUsers: () => canInviteUsers(),
+    canManageWorkspace: () => canManageWorkspace(),
   }),
 }));
 
@@ -70,6 +78,7 @@ vi.mock("../providers/auth-provider/hooks/use-auth", () => ({
 
 beforeEach(() => {
   canInviteUsers.mockReturnValue(true);
+  canManageWorkspace.mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -215,5 +224,148 @@ describe("MembersTable agent badge", () => {
     );
 
     expect(screen.queryByText("team:members.agentBadge")).toBeNull();
+  });
+});
+
+describe("MembersTable agent revoke", () => {
+  const agentMember = {
+    id: "member-agent-1",
+    userId: "user-agent-1",
+    role: "member",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    user: {
+      id: "user-agent-1",
+      name: "Release Bot",
+      email: "agent-release-bot@agents.invalid",
+      image: null,
+    },
+  } as unknown as WorkspaceUser;
+
+  const humanMember = {
+    id: "member-human-1",
+    userId: "user-human-1",
+    role: "member",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    user: {
+      id: "user-human-1",
+      name: "Jane Human",
+      email: "jane@example.com",
+      image: null,
+    },
+  } as unknown as WorkspaceUser;
+
+  it("offers 'Revoke Agent' instead of 'Remove Member' on an agent row, and calls useDeleteAgent on confirm", async () => {
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[agentMember]}
+        agentUserIds={new Set(["user-agent-1"])}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "team:membersTable.ariaRevokeAgent",
+      }),
+    );
+
+    expect(
+      screen.queryByRole("menuitem", {
+        name: "team:membersTable.removeMember",
+      }),
+    ).toBeNull();
+
+    fireEvent.click(
+      await screen.findByRole("menuitem", {
+        name: "team:membersTable.revokeAgent",
+      }),
+    );
+
+    expect(
+      await screen.findByText("team:membersTable.revokeDialogTitle"),
+    ).toBeVisible();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "team:membersTable.revokeAgent" }),
+    );
+
+    await waitFor(() =>
+      expect(deleteAgentMutateAsync).toHaveBeenCalledWith({
+        id: "user-agent-1",
+      }),
+    );
+  });
+
+  it("never renders the generic remove-member action for an agent row, even when canRemoveMembers is true", () => {
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[agentMember, humanMember]}
+        agentUserIds={new Set(["user-agent-1"])}
+      />,
+    );
+
+    // The human row still gets the generic action...
+    expect(
+      screen.getByRole("button", {
+        name: "team:membersTable.ariaRemoveMember",
+      }),
+    ).toBeVisible();
+    // ...but there is exactly one row menu trigger for the agent, and it's
+    // the revoke-specific one, never the generic remove action.
+    expect(
+      screen.getByRole("button", { name: "team:membersTable.ariaRevokeAgent" }),
+    ).toBeVisible();
+  });
+
+  it("hides the revoke action for an agent row when canManageWorkspace is false, even if canRemoveMembers is true", () => {
+    canManageWorkspace.mockReturnValue(false);
+
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[agentMember]}
+        agentUserIds={new Set(["user-agent-1"])}
+      />,
+    );
+
+    // The UI must never offer an action the server will 403.
+    expect(
+      screen.queryByRole("button", {
+        name: "team:membersTable.ariaRevokeAgent",
+      }),
+    ).toBeNull();
+  });
+
+  it("shows key-invalidation copy in the confirmation dialog for an agent row", async () => {
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[agentMember]}
+        agentUserIds={new Set(["user-agent-1"])}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "team:membersTable.ariaRevokeAgent",
+      }),
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", {
+        name: "team:membersTable.revokeAgent",
+      }),
+    );
+
+    expect(
+      await screen.findByText("team:membersTable.revokeDialogDescription"),
+    ).toBeVisible();
+    expect(
+      screen.queryByText("team:membersTable.removeDialogDescription"),
+    ).toBeNull();
   });
 });

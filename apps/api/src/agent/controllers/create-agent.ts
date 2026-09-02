@@ -3,13 +3,22 @@ import { createId } from "@paralleldrive/cuid2";
 import { eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { auth } from "../../auth";
+import { syncWorkspaceSeats } from "../../billing/controllers/sync-seats";
 import db from "../../database";
 import { userTable, workspaceUserTable } from "../../database/schema";
+
+// 90 days: matches the longest preset already offered for personal keys
+// (apps/web/src/components/settings/create-api-key-dialog.tsx). Long enough
+// that automation isn't forced into disruptive re-provisioning cycles --
+// there is no rotation UI, delete-and-recreate is the only path back -- short
+// enough that a leaked or forgotten agent key doesn't stay valid forever.
+export const AGENT_API_KEY_EXPIRES_IN_SECONDS = 90 * 24 * 60 * 60;
 
 async function createAgent(
   workspaceId: string,
   name: string,
   role: DefaultRoleName = "member",
+  actorUserId?: string,
 ) {
   // agents.invalid uses the RFC 2606 reserved ".invalid" TLD: guaranteed
   // non-routable, so nothing ever emails it, and unambiguous in the DB as a
@@ -65,7 +74,25 @@ async function createAgent(
       body: {
         userId: agent.id,
         name: `${name} (agent key)`,
+        expiresIn: AGENT_API_KEY_EXPIRES_IN_SECONDS,
       },
+    });
+
+    // Fire-and-forget, mirroring afterAddMember in auth.ts -- agent creation
+    // bypasses the organization plugin's own adapter path (this is a raw
+    // insert), so that hook never fires for it and seat counts would
+    // otherwise drift until the nightly reconciliation job catches it. A
+    // no-op on self-hosted instances (syncWorkspaceSeats short-circuits when
+    // billing is off).
+    void syncWorkspaceSeats(workspaceId).catch((error) => {
+      console.error("Seat sync after agent create failed:", error);
+    });
+
+    console.log("Agent created", {
+      agentUserId: agent.id,
+      workspaceId,
+      role,
+      createdBy: actorUserId,
     });
 
     return {

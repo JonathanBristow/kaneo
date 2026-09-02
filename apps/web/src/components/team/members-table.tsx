@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import useDeleteAgent from "@/hooks/mutations/agent/use-delete-agent";
 import useCancelInvitation from "@/hooks/mutations/workspace-user/use-cancel-invitation";
 import useDeleteWorkspaceUser from "@/hooks/mutations/workspace-user/use-delete-workspace-user";
 import useUpdateWorkspaceUserRole from "@/hooks/mutations/workspace-user/use-update-workspace-user-role";
@@ -111,16 +112,28 @@ function MembersTable({
   const { user: currentUser } = useAuth();
   const { mutateAsync: deleteWorkspaceUser, isPending: isDeleting } =
     useDeleteWorkspaceUser();
+  const { mutateAsync: deleteAgent, isPending: isRevoking } =
+    useDeleteAgent(workspaceId);
   const { mutateAsync: cancelInvitation, isPending: isCancelling } =
     useCancelInvitation();
   const { mutateAsync: updateMemberRole } = useUpdateWorkspaceUserRole();
   const { copy: copyInvitationLink } = useCopyInvitationLink();
   const { data: allWorkspaceRoles = [] } = useWorkspaceRoles(workspaceId);
-  const { canManageTeam, canRemoveMembers, canInviteUsers } =
-    useWorkspacePermission();
+  const {
+    canManageTeam,
+    canRemoveMembers,
+    canInviteUsers,
+    canManageWorkspace,
+  } = useWorkspacePermission();
   const canChangeRoles = Boolean(canManageTeam());
   const canRemove = Boolean(canRemoveMembers());
   const canInvite = Boolean(canInviteUsers());
+  // Revoking an agent invalidates its API key (see afterRemoveMember in
+  // apps/api/src/auth.ts) -- gate it on the same permission the server
+  // enforces on DELETE /api/agent/:id, not the lighter member:delete a
+  // human removal only needs, so the UI never offers an action the server
+  // will 403.
+  const canRevokeAgent = Boolean(canManageWorkspace());
 
   const customRoles = allWorkspaceRoles.filter(
     (role) => !RESERVED_ROLE_NAMES.has(role.role),
@@ -153,19 +166,32 @@ function MembersTable({
     }
   };
 
+  const memberToDeleteIsAgent = memberToDelete
+    ? (agentUserIds?.has(memberToDelete.userId) ?? false)
+    : false;
+
   const handleDeleteMember = async () => {
     if (!memberToDelete) return;
     try {
-      await deleteWorkspaceUser({
-        workspaceId,
-        userId: memberToDelete.user.email,
-      });
-      toast.success(t("team:membersTable.removeSuccess"));
+      if (memberToDeleteIsAgent) {
+        await deleteAgent({ id: memberToDelete.userId });
+        toast.success(t("team:membersTable.revokeSuccess"));
+      } else {
+        await deleteWorkspaceUser({
+          workspaceId,
+          userId: memberToDelete.user.email,
+        });
+        toast.success(t("team:membersTable.removeSuccess"));
+      }
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : t("team:membersTable.removeError"),
+          : t(
+              memberToDeleteIsAgent
+                ? "team:membersTable.revokeError"
+                : "team:membersTable.removeError",
+            ),
       );
     } finally {
       setMemberToDelete(null);
@@ -315,7 +341,7 @@ function MembersTable({
                   {member.createdAt ? formatDateMedium(member.createdAt) : "–"}
                 </TableCell>
                 <TableCell className="pe-6 py-3 text-right">
-                  {!isSelf && canRemove ? (
+                  {!isSelf && (isAgent ? canRevokeAgent : canRemove) ? (
                     <Menu>
                       <MenuTrigger
                         render={
@@ -323,7 +349,11 @@ function MembersTable({
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-muted-foreground"
-                            aria-label={t("team:membersTable.ariaRemoveMember")}
+                            aria-label={t(
+                              isAgent
+                                ? "team:membersTable.ariaRevokeAgent"
+                                : "team:membersTable.ariaRemoveMember",
+                            )}
                           />
                         }
                       >
@@ -332,7 +362,11 @@ function MembersTable({
                       <MenuPopup align="end">
                         <MenuItem onClick={() => setMemberToDelete(member)}>
                           <TrashIcon className="size-4" />
-                          {t("team:membersTable.removeMember")}
+                          {t(
+                            isAgent
+                              ? "team:membersTable.revokeAgent"
+                              : "team:membersTable.removeMember",
+                          )}
                         </MenuItem>
                       </MenuPopup>
                     </Menu>
@@ -446,19 +480,34 @@ function MembersTable({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t("team:membersTable.removeDialogTitle")}
+              {t(
+                memberToDeleteIsAgent
+                  ? "team:membersTable.revokeDialogTitle"
+                  : "team:membersTable.removeDialogTitle",
+              )}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("team:membersTable.removeDialogDescription", {
-                name:
-                  memberToDelete?.user.name || memberToDelete?.user.email || "",
-              })}
+              {t(
+                memberToDeleteIsAgent
+                  ? "team:membersTable.revokeDialogDescription"
+                  : "team:membersTable.removeDialogDescription",
+                {
+                  name:
+                    memberToDelete?.user.name ||
+                    memberToDelete?.user.email ||
+                    "",
+                },
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogClose
               render={
-                <Button variant="outline" size="sm" disabled={isDeleting} />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isDeleting || isRevoking}
+                />
               }
             >
               {t("common:actions.cancel")}
@@ -468,13 +517,17 @@ function MembersTable({
                 <Button
                   variant="destructive"
                   size="sm"
-                  disabled={isDeleting}
+                  disabled={isDeleting || isRevoking}
                   onClick={handleDeleteMember}
                 />
               }
             >
               <TrashIcon className="mr-2 size-4" />
-              {t("team:membersTable.removeMember")}
+              {t(
+                memberToDeleteIsAgent
+                  ? "team:membersTable.revokeAgent"
+                  : "team:membersTable.removeMember",
+              )}
             </AlertDialogClose>
           </AlertDialogFooter>
         </AlertDialogContent>

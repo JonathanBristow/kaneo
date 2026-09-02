@@ -244,6 +244,30 @@ describe("API integration: agent members", () => {
       );
       expect(response.status).toBe(401);
     });
+
+    it("mints a key with a bounded default lifetime rather than one that never expires", async () => {
+      const admin = await createWorkspaceMember({ role: "admin" });
+      mockAuthenticatedSession(admin.user);
+      const { app } = createApp();
+
+      const beforeCreate = Date.now();
+      const createResponse = await postCreateAgent(app, admin.workspace.id);
+      const { user: agentUser } =
+        (await createResponse.json()) as CreateAgentResult;
+
+      const keyRow = await db.query.apikeyTable.findFirst({
+        where: eq(schema.apikeyTable.referenceId, agentUser.id),
+      });
+
+      expect(keyRow?.expiresAt).toBeInstanceOf(Date);
+      const expiresInDays =
+        ((keyRow?.expiresAt?.getTime() ?? 0) - beforeCreate) /
+        (24 * 60 * 60 * 1000);
+      // Loose bound (89-91 days) so this isn't brittle against the small
+      // amount of time the request itself takes.
+      expect(expiresInDays).toBeGreaterThan(89);
+      expect(expiresInDays).toBeLessThan(91);
+    });
   });
 
   describe("GET /api/agent (list)", () => {
@@ -381,6 +405,88 @@ describe("API integration: agent members", () => {
         where: eq(schema.workspaceUserTable.userId, agentUser.id),
       });
       expect(memberRow).toBeDefined();
+    });
+
+    it("revokes the key even when removed via organization.removeMember directly, bypassing DELETE /api/agent/:id entirely", async () => {
+      const { app } = createApp();
+
+      // organization.remove-member is routed through auth.handler directly,
+      // which resolves its own session from a real cookie -- it does not go
+      // through authenticateApiRequest, so mockAuthenticatedSession (which
+      // only stubs auth.api.getSession for OUR OWN routes) doesn't apply
+      // here. A real sign-up + org-create round trip, exactly like
+      // billing-delete-guard.test.ts, is what gets a cookie this endpoint
+      // actually accepts.
+      const signUp = await app.request("/api/auth/sign-up/email", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: "owner@example.com",
+          password: "correct horse battery staple",
+          name: "Owner",
+        }),
+      });
+      expect(signUp.status).toBe(200);
+      const cookie = signUp.headers
+        .getSetCookie()
+        .map((entry) => entry.split(";")[0])
+        .join("; ");
+
+      const orgCreated = await app.request("/api/auth/organization/create", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({
+          name: "Bypass Test Space",
+          slug: "bypass-test",
+        }),
+      });
+      expect(orgCreated.status).toBe(200);
+      const workspace = (await orgCreated.json()) as { id: string };
+
+      const createResponse = await app.request("/api/agent", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({
+          workspaceId: workspace.id,
+          name: "Release Bot",
+        }),
+      });
+      expect(createResponse.status).toBe(200);
+      const { user: agentUser, apiKey } =
+        (await createResponse.json()) as CreateAgentResult;
+
+      // This is the org plugin's own generic member-removal endpoint --
+      // the same one a human removal goes through, and the exact path this
+      // hole allowed before afterRemoveMember's isAgent check was added in
+      // apps/api/src/auth.ts. Never touches /api/agent.
+      const removeResponse = await app.request(
+        "/api/auth/organization/remove-member",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie },
+          body: JSON.stringify({
+            // The web app's own human-removal path (use-delete-workspace-user.ts)
+            // always sends the member's email here too -- match that rather
+            // than the user id, since remove-member's non-email branch looks
+            // up by the org-membership row's own id, not the user id.
+            memberIdOrEmail: agentUser.email,
+            organizationId: workspace.id,
+          }),
+        },
+      );
+      expect(removeResponse.status).toBe(200);
+
+      const keys = await db
+        .select()
+        .from(schema.apikeyTable)
+        .where(eq(schema.apikeyTable.referenceId, agentUser.id));
+      expect(keys).toHaveLength(0);
+
+      const authResponse = await app.request(
+        `/api/workspace/${workspace.id}/members`,
+        { headers: { "x-api-key": apiKey } },
+      );
+      expect(authResponse.status).toBe(401);
     });
 
     it("will not resolve an ordinary member's id as an agent to delete", async () => {

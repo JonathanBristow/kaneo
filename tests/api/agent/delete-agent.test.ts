@@ -3,12 +3,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSelect = vi.fn();
 const mockTransaction = vi.fn();
+const mockSyncWorkspaceSeats = vi.fn();
 
 vi.mock("../../../apps/api/src/database", () => ({
   default: {
     select: (...args: unknown[]) => mockSelect(...args),
     transaction: (...args: unknown[]) => mockTransaction(...args),
   },
+}));
+
+vi.mock("../../../apps/api/src/billing/controllers/sync-seats", () => ({
+  syncWorkspaceSeats: (...args: unknown[]) => mockSyncWorkspaceSeats(...args),
 }));
 
 import deleteAgent from "../../../apps/api/src/agent/controllers/delete-agent";
@@ -45,6 +50,7 @@ function makeTx() {
 describe("deleteAgent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSyncWorkspaceSeats.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -71,10 +77,21 @@ describe("deleteAgent", () => {
     const { tx, apikeyWhere, memberWhere } = makeTx();
     mockTransaction.mockImplementation(async (cb) => cb(tx));
 
-    const result = await deleteAgent("agent-1", "workspace-1");
+    const result = await deleteAgent("agent-1", "workspace-1", "admin-user-1");
 
     expect(result).toEqual(MEMBERSHIP);
     expect(apikeyWhere).toHaveBeenCalledTimes(1);
     expect(memberWhere).toHaveBeenCalledTimes(1);
+    expect(mockSyncWorkspaceSeats).toHaveBeenCalledWith("workspace-1");
+  });
+
+  it("does not sync seats when the id has no agent membership", async () => {
+    mockSelect.mockReturnValue(makeSelectMock([]));
+
+    await expect(
+      deleteAgent("not-an-agent", "workspace-1"),
+    ).rejects.toBeInstanceOf(HTTPException);
+
+    expect(mockSyncWorkspaceSeats).not.toHaveBeenCalled();
   });
 });

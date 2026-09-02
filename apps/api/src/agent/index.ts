@@ -99,7 +99,7 @@ const deleteAgentRoute = createRoute({
 const agent = apiRouter<BaseVariables & { workspaceId: string }>()
   .openapi(createAgentRoute, async (c) => {
     const { workspaceId, name, role } = c.req.valid("json");
-    const result = await createAgent(workspaceId, name, role);
+    const result = await createAgent(workspaceId, name, role, c.get("userId"));
     return c.json(result, 200);
   })
   .openapi(getAgentsRoute, async (c) => {
@@ -108,7 +108,7 @@ const agent = apiRouter<BaseVariables & { workspaceId: string }>()
   })
   .openapi(deleteAgentRoute, async (c) => {
     const { id } = c.req.valid("param");
-    const result = await deleteAgent(id, c.get("workspaceId"));
+    const result = await deleteAgent(id, c.get("workspaceId"), c.get("userId"));
     return c.json(result, 200);
   });
 

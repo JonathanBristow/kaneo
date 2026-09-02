@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mockTransaction = vi.fn();
 const mockDelete = vi.fn();
 const mockCreateApiKey = vi.fn();
+const mockSyncWorkspaceSeats = vi.fn();
 
 vi.mock("../../../apps/api/src/database", () => ({
   default: {
@@ -20,7 +21,13 @@ vi.mock("../../../apps/api/src/auth", () => ({
   },
 }));
 
-import createAgent from "../../../apps/api/src/agent/controllers/create-agent";
+vi.mock("../../../apps/api/src/billing/controllers/sync-seats", () => ({
+  syncWorkspaceSeats: (...args: unknown[]) => mockSyncWorkspaceSeats(...args),
+}));
+
+import createAgent, {
+  AGENT_API_KEY_EXPIRES_IN_SECONDS,
+} from "../../../apps/api/src/agent/controllers/create-agent";
 
 const INSERTED_USER = {
   id: "agent-user-1",
@@ -47,6 +54,7 @@ function makeTx() {
 describe("createAgent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSyncWorkspaceSeats.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -57,8 +65,14 @@ describe("createAgent", () => {
     const { tx, userValues, memberValues } = makeTx();
     mockTransaction.mockImplementation(async (cb) => cb(tx));
     mockCreateApiKey.mockResolvedValue({ key: "raw-agent-key-abc123" });
+    mockSyncWorkspaceSeats.mockResolvedValue(undefined);
 
-    const result = await createAgent("workspace-1", "Release Bot", "admin");
+    const result = await createAgent(
+      "workspace-1",
+      "Release Bot",
+      "admin",
+      "admin-user-1",
+    );
 
     expect(userValues).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -77,9 +91,13 @@ describe("createAgent", () => {
     );
     expect(mockCreateApiKey).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: expect.objectContaining({ userId: INSERTED_USER.id }),
+        body: expect.objectContaining({
+          userId: INSERTED_USER.id,
+          expiresIn: AGENT_API_KEY_EXPIRES_IN_SECONDS,
+        }),
       }),
     );
+    expect(mockSyncWorkspaceSeats).toHaveBeenCalledWith("workspace-1");
     expect(result).toEqual({
       user: {
         id: INSERTED_USER.id,
@@ -122,5 +140,8 @@ describe("createAgent", () => {
     expect((caught as HTTPException).status).toBe(502);
     expect(mockDelete).toHaveBeenCalledTimes(1);
     expect(deleteWhere).toHaveBeenCalledTimes(1);
+    // A failed provision nets out to zero member-count change -- seat sync
+    // is only meaningful once an agent actually exists.
+    expect(mockSyncWorkspaceSeats).not.toHaveBeenCalled();
   });
 });

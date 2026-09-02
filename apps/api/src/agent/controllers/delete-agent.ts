@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
+import { syncWorkspaceSeats } from "../../billing/controllers/sync-seats";
 import db from "../../database";
 import {
   apikeyTable,
@@ -29,7 +30,11 @@ import {
 // whole lifecycle in this prototype, with no re-invite flow) can never be
 // reattached. It is a known, accepted piece of cruft for this pass -- see
 // the feature's final report for the alternative considered.
-async function deleteAgent(agentId: string, workspaceId: string) {
+async function deleteAgent(
+  agentId: string,
+  workspaceId: string,
+  actorUserId?: string,
+) {
   const [membership] = await db
     .select({
       id: userTable.id,
@@ -63,6 +68,19 @@ async function deleteAgent(agentId: string, workspaceId: string) {
           eq(workspaceUserTable.workspaceId, workspaceId),
         ),
       );
+  });
+
+  // Fire-and-forget, mirroring afterRemoveMember in auth.ts -- this raw
+  // delete bypasses the organization plugin's own adapter path, so that hook
+  // never fires here. A no-op on self-hosted instances.
+  void syncWorkspaceSeats(workspaceId).catch((error) => {
+    console.error("Seat sync after agent revoke failed:", error);
+  });
+
+  console.log("Agent revoked", {
+    agentUserId: agentId,
+    workspaceId,
+    revokedBy: actorUserId,
   });
 
   return membership;
