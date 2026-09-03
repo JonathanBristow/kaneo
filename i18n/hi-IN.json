@@ -2121,7 +2121,13 @@
 			"cancelInviteSuccess": "निमंत्रण सफलतापूर्वक रद्द किया गया",
 			"cancelInviteError": "निमंत्रण रद्द करने में विफल",
 			"roleUpdateSuccess": "भूमिका अपडेट की गई",
-			"roleUpdateError": "भूमिका अपडेट करने में विफल"
+			"roleUpdateError": "भूमिका अपडेट करने में विफल",
+			"ariaRevokeAgent": "Revoke agent",
+			"revokeAgent": "Revoke Agent",
+			"revokeDialogDescription": "Are you sure you want to revoke {{name}}? This invalidates its API key immediately. This action cannot be undone — a new agent would need to be created in its place.",
+			"revokeDialogTitle": "Revoke Agent?",
+			"revokeError": "Failed to revoke agent",
+			"revokeSuccess": "Agent revoked successfully"
 		},
 		"addAgentModal": {
 			"alertDescription": "This key will not be shown again. If you lose it, revoke this agent and create a new one.",
@@ -2138,7 +2144,6 @@
 			"error": "Failed to create agent",
 			"nameLabel": "Name",
 			"namePlaceholder": "Release Bot",
-			"roleLabel": "Role",
 			"title": "Add Agent",
 			"toastCopied": "API key copied"
 		}

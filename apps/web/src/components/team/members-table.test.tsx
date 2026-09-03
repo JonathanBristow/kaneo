@@ -181,7 +181,9 @@ describe("MembersTable agent badge", () => {
     user: {
       id: "user-agent-1",
       name: "Release Bot",
-      email: "agent-release-bot@agents.invalid",
+      // Real API responses return null here -- userTable.email is nullable
+      // for agent rows.
+      email: null,
       image: null,
     },
   } as unknown as WorkspaceUser;
@@ -224,6 +226,36 @@ describe("MembersTable agent badge", () => {
     );
 
     expect(screen.queryByText("team:members.agentBadge")).toBeNull();
+  });
+
+  it("shows no email for an agent row, but still shows the human's email", () => {
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[agentMember, humanMember]}
+        agentUserIds={new Set(["user-agent-1"])}
+      />,
+    );
+
+    expect(screen.getByText("jane@example.com")).toBeVisible();
+    expect(screen.queryByText("agents.invalid", { exact: false })).toBeNull();
+  });
+
+  it("shows a dash instead of a role for an agent row, regardless of the stored role value", () => {
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[agentMember, humanMember]}
+        agentUserIds={new Set(["user-agent-1"])}
+      />,
+    );
+
+    expect(screen.getByText("—")).toBeVisible();
+    // The human row still shows its real role, proving the dash is
+    // agent-specific rather than a global change to the Role column.
+    expect(screen.getByText("team:roles.member")).toBeVisible();
   });
 });
 

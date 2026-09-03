@@ -8724,10 +8724,19 @@
 						"ariaRemoveMember": {
 							"type": "string"
 						},
+						"ariaRevokeAgent": {
+							"type": "string"
+						},
 						"removeDialogTitle": {
 							"type": "string"
 						},
 						"removeDialogDescription": {
+							"type": "string"
+						},
+						"revokeDialogTitle": {
+							"type": "string"
+						},
+						"revokeDialogDescription": {
 							"type": "string"
 						},
 						"cancelDialogTitle": {
@@ -8739,6 +8748,9 @@
 						"removeMember": {
 							"type": "string"
 						},
+						"revokeAgent": {
+							"type": "string"
+						},
 						"cancelInvitation": {
 							"type": "string"
 						},
@@ -8746,6 +8758,12 @@
 							"type": "string"
 						},
 						"removeError": {
+							"type": "string"
+						},
+						"revokeSuccess": {
+							"type": "string"
+						},
+						"revokeError": {
 							"type": "string"
 						},
 						"cancelInviteSuccess": {
@@ -8769,14 +8787,20 @@
 						"ariaCancelInvitation",
 						"ariaInvitationActions",
 						"ariaRemoveMember",
+						"ariaRevokeAgent",
 						"removeDialogTitle",
 						"removeDialogDescription",
+						"revokeDialogTitle",
+						"revokeDialogDescription",
 						"cancelDialogTitle",
 						"cancelDialogDescription",
 						"removeMember",
+						"revokeAgent",
 						"cancelInvitation",
 						"removeSuccess",
 						"removeError",
+						"revokeSuccess",
+						"revokeError",
 						"cancelInviteSuccess",
 						"cancelInviteError",
 						"roleUpdateSuccess",
@@ -8794,9 +8818,6 @@
 							"type": "string"
 						},
 						"namePlaceholder": {
-							"type": "string"
-						},
-						"roleLabel": {
 							"type": "string"
 						},
 						"create": {
@@ -8843,7 +8864,6 @@
 						"title",
 						"nameLabel",
 						"namePlaceholder",
-						"roleLabel",
 						"create",
 						"creating",
 						"error",

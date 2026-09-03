@@ -29,7 +29,7 @@ const createAgentRoute = createRoute({
   tags: ["Agents"],
   summary: "Create agent member",
   description:
-    "Create a non-human workspace member (no email/sign-up flow) and mint an API key for it, scoped to the given workspace role. The key is returned once and never stored in recoverable form.",
+    "Create a non-human workspace member (no email/sign-up flow, no role choice -- every agent is created as a member) and mint an API key for it. The key is returned once and never stored in recoverable form.",
   middleware: [
     workspaceAccess.fromBody(),
     requireWorkspacePermission({ workspace: ["manage_settings"] }),
@@ -98,8 +98,8 @@ const deleteAgentRoute = createRoute({
 
 const agent = apiRouter<BaseVariables & { workspaceId: string }>()
   .openapi(createAgentRoute, async (c) => {
-    const { workspaceId, name, role } = c.req.valid("json");
-    const result = await createAgent(workspaceId, name, role, c.get("userId"));
+    const { workspaceId, name } = c.req.valid("json");
+    const result = await createAgent(workspaceId, name, c.get("userId"));
     return c.json(result, 200);
   })
   .openapi(getAgentsRoute, async (c) => {

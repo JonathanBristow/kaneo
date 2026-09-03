@@ -32,7 +32,7 @@ import createAgent, {
 const INSERTED_USER = {
   id: "agent-user-1",
   name: "Release Bot",
-  email: "agent-generated@agents.invalid",
+  email: null,
   isAgent: true,
 };
 
@@ -61,7 +61,7 @@ describe("createAgent", () => {
     vi.restoreAllMocks();
   });
 
-  it("inserts a synthetic .invalid email and the given role, and returns the minted key", async () => {
+  it("inserts a null email and the fixed member role, and returns the minted key", async () => {
     const { tx, userValues, memberValues } = makeTx();
     mockTransaction.mockImplementation(async (cb) => cb(tx));
     mockCreateApiKey.mockResolvedValue({ key: "raw-agent-key-abc123" });
@@ -70,7 +70,6 @@ describe("createAgent", () => {
     const result = await createAgent(
       "workspace-1",
       "Release Bot",
-      "admin",
       "admin-user-1",
     );
 
@@ -79,14 +78,14 @@ describe("createAgent", () => {
         name: "Release Bot",
         isAgent: true,
         emailVerified: false,
-        email: expect.stringMatching(/^agent-.+@agents\.invalid$/),
+        email: null,
       }),
     );
     expect(memberValues).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId: "workspace-1",
         userId: INSERTED_USER.id,
-        role: "admin",
+        role: "member",
       }),
     );
     expect(mockCreateApiKey).toHaveBeenCalledWith(
@@ -102,24 +101,12 @@ describe("createAgent", () => {
       user: {
         id: INSERTED_USER.id,
         name: INSERTED_USER.name,
-        email: INSERTED_USER.email,
-        role: "admin",
+        email: null,
+        role: "member",
         joinedAt: expect.any(Date),
       },
       apiKey: "raw-agent-key-abc123",
     });
-  });
-
-  it("defaults to the member role when none is given", async () => {
-    const { tx, memberValues } = makeTx();
-    mockTransaction.mockImplementation(async (cb) => cb(tx));
-    mockCreateApiKey.mockResolvedValue({ key: "raw-key" });
-
-    await createAgent("workspace-1", "Release Bot");
-
-    expect(memberValues).toHaveBeenCalledWith(
-      expect.objectContaining({ role: "member" }),
-    );
   });
 
   it("deletes the just-created user and throws 502 when minting the key fails", async () => {
@@ -131,7 +118,7 @@ describe("createAgent", () => {
 
     let caught: unknown;
     try {
-      await createAgent("workspace-1", "Release Bot", "member");
+      await createAgent("workspace-1", "Release Bot");
     } catch (error) {
       caught = error;
     }

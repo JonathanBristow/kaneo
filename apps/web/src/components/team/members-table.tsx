@@ -243,10 +243,10 @@ function MembersTable({
             const isSelf = currentUser?.id === member.userId;
             const isAgent = agentUserIds?.has(member.userId) ?? false;
             const showRoleSelect =
-              canChangeRoles && !isSelf && member.role !== "owner";
-            const tone = toneFor(member.user.email);
+              canChangeRoles && !isSelf && !isAgent && member.role !== "owner";
+            const tone = toneFor(member.user.email ?? member.userId);
             return (
-              <TableRow key={member.user.email}>
+              <TableRow key={member.userId}>
                 <TableCell className="ps-6 py-3">
                   <div className="flex items-center gap-3">
                     <Avatar className={cn("size-8", tone)}>
@@ -280,14 +280,24 @@ function MembersTable({
                           </span>
                         ) : null}
                       </div>
-                      <div className="truncate text-xs text-muted-foreground">
-                        {member.user.email}
-                      </div>
+                      {/* Agents have no email (userTable.email is null for
+                          them) -- nothing meaningful to show here. */}
+                      {isAgent ? null : (
+                        <div className="truncate text-xs text-muted-foreground">
+                          {member.user.email}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </TableCell>
                 <TableCell className="py-3">
-                  {member.role === "owner" ? (
+                  {isAgent ? (
+                    // Not just hidden from the create flow -- a role isn't a
+                    // concept worth surfacing for an agent row at all, so
+                    // this never falls through to the Owner badge/Select/
+                    // Badge branches below, regardless of the stored value.
+                    <span className="text-sm text-muted-foreground">—</span>
+                  ) : member.role === "owner" ? (
                     <Badge variant="outline" className="gap-1">
                       <ShieldIcon className="size-3" />
                       {t("team:roles.owner", { defaultValue: "Owner" })}

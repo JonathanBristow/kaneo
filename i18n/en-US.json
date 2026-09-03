@@ -2133,7 +2133,6 @@
 			"title": "Add Agent",
 			"nameLabel": "Name",
 			"namePlaceholder": "Release Bot",
-			"roleLabel": "Role",
 			"create": "Create Agent",
 			"creating": "Creating...",
 			"error": "Failed to create agent",

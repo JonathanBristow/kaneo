@@ -1,5 +1,4 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
-import { DEFAULT_ROLE_NAMES } from "@kaneo/permissions";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -27,13 +26,6 @@ import {
   FormMessage,
 } from "../ui/form";
 import { Input } from "../ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
 
 type Props = {
   open: boolean;
@@ -43,7 +35,6 @@ type Props = {
 
 const agentFormSchema = z.object({
   name: z.string().trim().min(1),
-  role: z.enum(DEFAULT_ROLE_NAMES),
 });
 
 type AgentFormValues = z.infer<typeof agentFormSchema>;
@@ -59,12 +50,12 @@ function AddAgentModal({ open, onClose, workspaceId }: Props) {
 
   const form = useForm<AgentFormValues>({
     resolver: standardSchemaResolver(agentFormSchema),
-    defaultValues: { name: "", role: "member" },
+    defaultValues: { name: "" },
   });
 
-  const onSubmit = async ({ name, role }: AgentFormValues) => {
+  const onSubmit = async ({ name }: AgentFormValues) => {
     try {
-      const result = await mutateAsync({ workspaceId, name, role });
+      const result = await mutateAsync({ workspaceId, name });
       setCreatedAgent({ name: result.user.name, apiKey: result.apiKey });
       form.reset();
     } catch (error) {
@@ -174,36 +165,6 @@ function AddAgentModal({ open, onClose, workspaceId }: Props) {
                           autoFocus
                           disabled={isPending}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("team:addAgentModal.roleLabel")}</FormLabel>
-                      <FormControl>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          disabled={isPending}
-                        >
-                          <SelectTrigger>
-                            <SelectValue>
-                              {t(`team:roles.${field.value}`)}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {DEFAULT_ROLE_NAMES.map((role) => (
-                              <SelectItem key={role} value={role}>
-                                {t(`team:roles.${role}`)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

@@ -2,6 +2,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   customType,
   foreignKey,
   index,
@@ -27,7 +28,10 @@ export const userTable = pgTable(
       .$defaultFn(() => createId())
       .primaryKey(),
     name: text("name").notNull(),
-    email: text("email").notNull().unique(),
+    // Nullable so agent rows (isAgent: true) don't need one -- they never
+    // sign in, so there's nothing an email would identify them to. The
+    // check constraint below still requires it for every real (human) row.
+    email: text("email").unique(),
     emailVerified: boolean("email_verified")
       .$defaultFn(() => false)
       .notNull(),
@@ -53,7 +57,13 @@ export const userTable = pgTable(
     banReason: text("ban_reason"),
     banExpires: timestamp("ban_expires", { mode: "date" }),
   },
-  (table) => [index("user_isAgent_idx").on(table.isAgent)],
+  (table) => [
+    index("user_isAgent_idx").on(table.isAgent),
+    check(
+      "user_email_required_for_humans",
+      sql`${table.isAgent} = true OR ${table.email} IS NOT NULL`,
+    ),
+  ],
 );
 
 export const sessionTable = pgTable(

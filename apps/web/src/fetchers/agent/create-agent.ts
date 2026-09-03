@@ -5,9 +5,9 @@ export type CreateAgentRequest = InferRequestType<
   (typeof client)["agent"]["$post"]
 >["json"];
 
-async function createAgent({ workspaceId, name, role }: CreateAgentRequest) {
+async function createAgent({ workspaceId, name }: CreateAgentRequest) {
   const response = await client.agent.$post({
-    json: { workspaceId, name, role },
+    json: { workspaceId, name },
   });
 
   if (!response.ok) {

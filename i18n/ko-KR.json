@@ -2114,7 +2114,13 @@
 			"cancelInviteError": "초대 취소에 실패했습니다",
 			"ariaInvitationActions": "초대 작업",
 			"roleUpdateSuccess": "역할이 업데이트되었습니다",
-			"roleUpdateError": "역할 업데이트에 실패했습니다"
+			"roleUpdateError": "역할 업데이트에 실패했습니다",
+			"ariaRevokeAgent": "Revoke agent",
+			"revokeAgent": "Revoke Agent",
+			"revokeDialogDescription": "Are you sure you want to revoke {{name}}? This invalidates its API key immediately. This action cannot be undone — a new agent would need to be created in its place.",
+			"revokeDialogTitle": "Revoke Agent?",
+			"revokeError": "Failed to revoke agent",
+			"revokeSuccess": "Agent revoked successfully"
 		},
 		"addAgentModal": {
 			"alertDescription": "This key will not be shown again. If you lose it, revoke this agent and create a new one.",
@@ -2131,7 +2137,6 @@
 			"error": "Failed to create agent",
 			"nameLabel": "Name",
 			"namePlaceholder": "Release Bot",
-			"roleLabel": "Role",
 			"title": "Add Agent",
 			"toastCopied": "API key copied"
 		}

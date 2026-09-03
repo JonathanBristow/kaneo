@@ -1,5 +1,3 @@
-import type { DefaultRoleName } from "@kaneo/permissions";
-import { createId } from "@paralleldrive/cuid2";
 import { eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { auth } from "../../auth";
@@ -14,19 +12,20 @@ import { userTable, workspaceUserTable } from "../../database/schema";
 // enough that a leaked or forgotten agent key doesn't stay valid forever.
 export const AGENT_API_KEY_EXPIRES_IN_SECONDS = 90 * 24 * 60 * 60;
 
+// Not a choice offered at creation: every agent gets this role, full stop.
+// Letting an admin pick a role per agent implies each one needs its own
+// deliberate permission review, which is more ceremony than a v1 automation
+// identity warrants -- and it reopens the same "could this mint a second
+// owner" question role selection already had to guard against. "member" is
+// the least-surprising default: it can create/read tasks and comment, not
+// touch workspace settings or other membership.
+const AGENT_ROLE = "member";
+
 async function createAgent(
   workspaceId: string,
   name: string,
-  role: DefaultRoleName = "member",
   actorUserId?: string,
 ) {
-  // agents.invalid uses the RFC 2606 reserved ".invalid" TLD: guaranteed
-  // non-routable, so nothing ever emails it, and unambiguous in the DB as a
-  // synthetic identity rather than a mistyped real address. userTable.email
-  // is NOT NULL + UNIQUE, so a real value is required even though agents
-  // never sign in with it; the per-agent createId() suffix is what keeps it
-  // unique, not the (caller-supplied, unsanitized-for-uniqueness) name.
-  const email = `agent-${createId()}@agents.invalid`;
   const joinedAt = new Date();
 
   const agent = await db.transaction(async (tx) => {
@@ -35,12 +34,15 @@ async function createAgent(
     // intentionally bypasses Better Auth's adapter/databaseHooks (the
     // registration-limit and first-user-admin-promotion checks in auth.ts),
     // which is correct here since neither applies to a workspace-scoped
-    // bot identity that can only be created by an existing admin.
+    // bot identity that can only be created by an existing admin. email is
+    // left null -- an agent never signs in, so there's nothing an email
+    // would identify it to; the check constraint on userTable only requires
+    // one for non-agent rows.
     const [inserted] = await tx
       .insert(userTable)
       .values({
         name,
-        email,
+        email: null,
         emailVerified: false,
         isAgent: true,
       })
@@ -53,7 +55,7 @@ async function createAgent(
     await tx.insert(workspaceUserTable).values({
       workspaceId,
       userId: inserted.id,
-      role,
+      role: AGENT_ROLE,
       joinedAt,
     });
 
@@ -91,7 +93,7 @@ async function createAgent(
     console.log("Agent created", {
       agentUserId: agent.id,
       workspaceId,
-      role,
+      role: AGENT_ROLE,
       createdBy: actorUserId,
     });
 
@@ -100,7 +102,7 @@ async function createAgent(
         id: agent.id,
         name: agent.name,
         email: agent.email,
-        role,
+        role: AGENT_ROLE,
         joinedAt,
       },
       apiKey: created.key,

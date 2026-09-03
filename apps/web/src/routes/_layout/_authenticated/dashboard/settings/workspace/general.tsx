@@ -37,6 +37,7 @@ import { Separator } from "@/components/ui/separator";
 import useDeleteWorkspace from "@/hooks/mutations/workspace/use-delete-workspace";
 import useTransferWorkspaceOwnership from "@/hooks/mutations/workspace/use-transfer-workspace-ownership";
 import useUpdateWorkspace from "@/hooks/mutations/workspace/use-update-workspace";
+import useGetAgents from "@/hooks/queries/agent/use-get-agents";
 import useActiveWorkspace from "@/hooks/queries/workspace/use-active-workspace";
 import useGetFullWorkspace from "@/hooks/queries/workspace/use-get-full-workspace";
 import { useWorkspacePermission } from "@/hooks/use-workspace-permission";
@@ -119,6 +120,11 @@ function RouteComponent() {
   const { data: fullWorkspace } = useGetFullWorkspace({
     workspaceId: workspace?.id,
   });
+  const { data: agents = [] } = useGetAgents(workspace?.id ?? "");
+  const agentUserIds = useMemo(
+    () => new Set(agents.map((agent) => agent.id)),
+    [agents],
+  );
   const { mutateAsync: updateWorkspace } = useUpdateWorkspace();
   const { mutateAsync: deleteWorkspace, isPending: isDeleting } =
     useDeleteWorkspace();
@@ -131,11 +137,16 @@ function RouteComponent() {
   const workspaceDescription = getWorkspaceDescription(workspace);
 
   // Ownership transfer is owner-only. Eligible recipients are any current
-  // member who isn't the owner themselves.
+  // human member who isn't the owner themselves -- an agent is never a
+  // candidate, sole ownership by a non-human identity isn't a state this
+  // app should ever let someone create.
   const members = fullWorkspace?.members ?? [];
   const currentOwnerMember = members.find((m) => m.role === "owner");
   const eligibleNewOwners = members.filter(
-    (m) => m.role !== "owner" && m.userId !== currentUser?.id,
+    (m) =>
+      m.role !== "owner" &&
+      m.userId !== currentUser?.id &&
+      !agentUserIds.has(m.userId),
   );
   const selectedMember = eligibleNewOwners.find(
     (m) => m.id === selectedNewOwnerId,

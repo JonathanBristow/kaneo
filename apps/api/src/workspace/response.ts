@@ -4,7 +4,9 @@ export const workspaceMemberSchema = z
   .object({
     id: z.string(),
     name: z.string(),
-    email: z.string(),
+    // Null for agent members -- they never sign in, so there's no email to
+    // give them.
+    email: z.string().nullable(),
     image: z.string().nullable(),
     role: z.string().openapi({
       description:

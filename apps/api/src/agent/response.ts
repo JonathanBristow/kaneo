@@ -4,7 +4,10 @@ export const agentMemberSchema = z
   .object({
     id: z.string(),
     name: z.string(),
-    email: z.string(),
+    // Always null in practice -- agents never sign in with one -- but the
+    // column is shared with human users, so the type stays nullable rather
+    // than lying about it.
+    email: z.string().nullable(),
     role: z.string(),
     joinedAt: responseTimestamp,
   })
@@ -26,6 +29,6 @@ export const deleteAgentResponseSchema = z
   .object({
     id: z.string(),
     name: z.string(),
-    email: z.string(),
+    email: z.string().nullable(),
   })
   .openapi("DeletedAgent");

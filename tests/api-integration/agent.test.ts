@@ -13,7 +13,7 @@ type CreateAgentResult = {
   user: {
     id: string;
     name: string;
-    email: string;
+    email: string | null;
     role: string;
     joinedAt: string;
   };
@@ -54,19 +54,17 @@ describe("API integration: agent members", () => {
   });
 
   describe("POST /api/agent (create)", () => {
-    it("allows an admin to create an agent and returns a user and a raw api key", async () => {
+    it("allows an admin to create an agent with a null email and the fixed member role", async () => {
       const admin = await createWorkspaceMember({ role: "admin" });
       mockAuthenticatedSession(admin.user);
       const { app } = createApp();
 
-      const response = await postCreateAgent(app, admin.workspace.id, {
-        role: "viewer",
-      });
+      const response = await postCreateAgent(app, admin.workspace.id);
       expect(response.status).toBe(200);
       const body = (await response.json()) as CreateAgentResult;
 
-      expect(body.user.email).toMatch(/^agent-.+@agents\.invalid$/);
-      expect(body.user.role).toBe("viewer");
+      expect(body.user.email).toBeNull();
+      expect(body.user.role).toBe("member");
       expect(typeof body.apiKey).toBe("string");
       expect(body.apiKey.length).toBeGreaterThan(10);
 
@@ -74,7 +72,7 @@ describe("API integration: agent members", () => {
         where: eq(schema.userTable.id, body.user.id),
       });
       expect(userRow?.isAgent).toBe(true);
-      expect(userRow?.email).toBe(body.user.email);
+      expect(userRow?.email).toBeNull();
 
       const memberRow = await db.query.workspaceUserTable.findFirst({
         where: and(
@@ -82,7 +80,7 @@ describe("API integration: agent members", () => {
           eq(schema.workspaceUserTable.workspaceId, admin.workspace.id),
         ),
       });
-      expect(memberRow?.role).toBe("viewer");
+      expect(memberRow?.role).toBe("member");
 
       const keyRow = await db.query.apikeyTable.findFirst({
         where: eq(schema.apikeyTable.referenceId, body.user.id),
@@ -93,14 +91,18 @@ describe("API integration: agent members", () => {
       expect(keyRow?.key).not.toBe(body.apiKey);
     });
 
-    it("defaults to the member role when none is given", async () => {
+    it("ignores a role in the request body -- there is no per-agent choice", async () => {
       const admin = await createWorkspaceMember({ role: "admin" });
       mockAuthenticatedSession(admin.user);
       const { app } = createApp();
 
-      const response = await postCreateAgent(app, admin.workspace.id);
+      const response = await postCreateAgent(app, admin.workspace.id, {
+        role: "admin",
+      });
       expect(response.status).toBe(200);
       const body = (await response.json()) as CreateAgentResult;
+      // Whatever the caller sent, the agent still gets the fixed role --
+      // createAgentBody no longer has a role field for zod to even parse.
       expect(body.user.role).toBe("member");
     });
 
@@ -117,28 +119,6 @@ describe("API integration: agent members", () => {
         .from(schema.userTable)
         .where(eq(schema.userTable.isAgent, true));
       expect(agents).toHaveLength(0);
-    });
-
-    it("rejects role: owner (a workspace has exactly one owner)", async () => {
-      const admin = await createWorkspaceMember({ role: "admin" });
-      mockAuthenticatedSession(admin.user);
-      const { app } = createApp();
-
-      const response = await postCreateAgent(app, admin.workspace.id, {
-        role: "owner",
-      });
-      expect(response.status).toBe(400);
-    });
-
-    it("rejects an unknown role string", async () => {
-      const admin = await createWorkspaceMember({ role: "admin" });
-      mockAuthenticatedSession(admin.user);
-      const { app } = createApp();
-
-      const response = await postCreateAgent(app, admin.workspace.id, {
-        role: "superadmin",
-      });
-      expect(response.status).toBe(400);
     });
 
     it("rejects an empty name", async () => {
@@ -159,9 +139,7 @@ describe("API integration: agent members", () => {
       mockAuthenticatedSession(admin.user);
       const { app } = createApp();
 
-      const createResponse = await postCreateAgent(app, admin.workspace.id, {
-        role: "member",
-      });
+      const createResponse = await postCreateAgent(app, admin.workspace.id);
       const { user: agentUser, apiKey } =
         (await createResponse.json()) as CreateAgentResult;
 
@@ -192,31 +170,28 @@ describe("API integration: agent members", () => {
       expect(persisted?.userId).not.toBe(admin.user.id);
     });
 
-    it("limits the agent to its assigned role's permissions and no more", async () => {
+    it("limits the agent to the fixed member role's permissions and no more", async () => {
       const admin = await createWorkspaceMember({ role: "admin" });
       mockAuthenticatedSession(admin.user);
       const { app } = createApp();
 
-      const createResponse = await postCreateAgent(app, admin.workspace.id, {
-        role: "viewer",
-      });
+      const createResponse = await postCreateAgent(app, admin.workspace.id);
       const { apiKey } = (await createResponse.json()) as CreateAgentResult;
 
-      // viewer lacks project:create.
-      const projectResponse = await app.request("/api/project", {
+      // member lacks workspace:manage_settings -- an agent can't mint
+      // another agent, or do anything else this route requires.
+      const createAnotherResponse = await app.request("/api/agent", {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": apiKey },
         body: JSON.stringify({
-          name: "agent attempt",
           workspaceId: admin.workspace.id,
-          slug: "AGT",
-          icon: "Folder",
+          name: "second agent attempt",
         }),
       });
-      expect(projectResponse.status).toBe(403);
+      expect(createAnotherResponse.status).toBe(403);
 
       // Listing workspace members has no permission gate beyond membership,
-      // which the agent does have (as a viewer).
+      // which the agent does have.
       const membersResponse = await app.request(
         `/api/workspace/${admin.workspace.id}/members`,
         { headers: { "x-api-key": apiKey } },
@@ -320,9 +295,7 @@ describe("API integration: agent members", () => {
       mockAuthenticatedSession(admin.user);
       const { app } = createApp();
 
-      const createResponse = await postCreateAgent(app, admin.workspace.id, {
-        role: "member",
-      });
+      const createResponse = await postCreateAgent(app, admin.workspace.id);
       const { user: agentUser, apiKey } =
         (await createResponse.json()) as CreateAgentResult;
 
@@ -455,6 +428,17 @@ describe("API integration: agent members", () => {
       const { user: agentUser, apiKey } =
         (await createResponse.json()) as CreateAgentResult;
 
+      // remove-member's memberIdOrEmail takes an email (the web app's own
+      // human-removal path always sends one) OR the org-membership row's
+      // own id -- never a user id. Agents have no email, so this has to be
+      // the membership id.
+      const membership = await db.query.workspaceUserTable.findFirst({
+        where: and(
+          eq(schema.workspaceUserTable.userId, agentUser.id),
+          eq(schema.workspaceUserTable.workspaceId, workspace.id),
+        ),
+      });
+
       // This is the org plugin's own generic member-removal endpoint --
       // the same one a human removal goes through, and the exact path this
       // hole allowed before afterRemoveMember's isAgent check was added in
@@ -465,11 +449,7 @@ describe("API integration: agent members", () => {
           method: "POST",
           headers: { "content-type": "application/json", cookie },
           body: JSON.stringify({
-            // The web app's own human-removal path (use-delete-workspace-user.ts)
-            // always sends the member's email here too -- match that rather
-            // than the user id, since remove-member's non-email branch looks
-            // up by the org-membership row's own id, not the user id.
-            memberIdOrEmail: agentUser.email,
+            memberIdOrEmail: membership?.id,
             organizationId: workspace.id,
           }),
         },

@@ -1,0 +1,2 @@
+ALTER TABLE "user" ALTER COLUMN "email" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "user" ADD CONSTRAINT "user_email_required_for_humans" CHECK ("user"."is_agent" = true OR "user"."email" IS NOT NULL);
