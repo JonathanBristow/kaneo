@@ -7,6 +7,7 @@ description: Learn how to authenticate API requests using API keys or the device
 All API endpoints require authentication. Kaneo currently supports two authentication patterns for API access:
 
 - API keys for scripts, services, and long-lived integrations
+- Agent member keys, which give automation its own workspace identity instead of a person's
 - Device authorization for CLIs and external apps that need browser-based sign-in
 
 ## Choose an Authentication Method
@@ -14,6 +15,17 @@ All API endpoints require authentication. Kaneo currently supports two authentic
 ### API keys
 
 Use API keys when you control secret storage and want a stable credential for a single Kaneo instance.
+
+### Agent member keys
+
+An [agent member](/core/functional/agent-members) is a non-human workspace member with its
+own name and its own API key. Requests made with an agent key are attributed to the agent
+rather than to a teammate, which keeps automated task and comment history distinguishable
+from human activity. Use one when a bot, script, or AI agent should act as itself in a
+single workspace.
+
+Agent keys are created by a workspace Owner or Admin from the **Members** page, are shown
+once, and expire after 90 days.
 
 ### Device authorization
 
@@ -64,6 +76,12 @@ After creating the API key, you'll be shown the full API key value. **Copy and s
 </Warning>
 </Step>
 </Steps>
+
+<Note>
+The steps above create a **personal** API key that acts as you. To create a key that acts
+as a dedicated automation identity instead, see [Add agent
+members](/core/functional/agent-members).
+</Note>
 
 ## Using Your API Key
 
@@ -173,6 +191,7 @@ curl -X GET https://your-kaneo-instance.com/api/task?workspaceId=your-workspace-
 - **Rotate keys regularly**: Periodically create new API keys and revoke old ones
 - **Limit key scope**: Only grant API keys to trusted applications and services
 - **Monitor usage**: Regularly review your API keys and remove any that are no longer needed
+- **Give automation its own identity**: Use an agent member key for bots and services rather than a personal key, so access can be revoked without affecting a person's account
 - **Allow only trusted device clients**: Keep `DEVICE_AUTH_CLIENT_IDS` limited to approved client IDs on self-hosted deployments
 - **Treat Bearer device tokens like secrets**: Do not print or log them unnecessarily in production clients
 

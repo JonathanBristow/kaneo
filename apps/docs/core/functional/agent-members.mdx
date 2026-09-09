@@ -1,0 +1,146 @@
+---
+title: Add Agent Members
+description: Give bots, scripts, and AI agents their own workspace identity and API key
+---
+
+An **agent member** is a non-human member of a workspace. It has a name and a workspace
+seat like anyone else, but it never signs in: it has no email address, no password, and
+no invitation to accept. Instead it authenticates with an API key that is minted when you
+create it.
+
+Use an agent when automation should act as itself rather than borrowing a person's
+credentials — a release bot that files tasks, a triage script that moves work between
+columns, or an AI agent connected through the API. Tasks it creates and comments it
+writes are attributed to the agent by name, so it is obvious in the task history which
+actions were automated.
+
+<Note>
+Creating and revoking agents requires the `workspace:manage_settings` permission, which
+the built-in **Owner** and **Admin** roles have. Being able to invite teammates is not
+enough — minting a credential is treated as an admin-level action.
+</Note>
+
+## Create an agent
+
+<Steps>
+<Step>
+**Open the workspace members page**
+
+Go to **Members** in your workspace.
+</Step>
+
+<Step>
+**Click Add agent**
+
+The button sits next to **Invite member**. It is only shown if you have permission to
+manage workspace settings.
+</Step>
+
+<Step>
+**Name the agent**
+
+Give it a name that says what the automation is, for example `Release Bot` or
+`Triage Agent`. The name is what appears on every task and comment the agent touches.
+
+There is no email field and no role picker — see [What an agent can
+do](#what-an-agent-can-do) below.
+</Step>
+
+<Step>
+**Copy the API key**
+
+Kaneo shows the key exactly once, immediately after creating the agent. Copy it before
+closing the dialog and store it wherever your automation keeps its secrets.
+
+<Warning>
+The key is stored only as a hash. It cannot be retrieved or re-displayed later, and there
+is no rotation flow — if you lose it, revoke the agent and create a new one.
+</Warning>
+</Step>
+</Steps>
+
+The agent then appears in the members table with an **agent** badge, no email address, and
+a dash in place of a role.
+
+## Use the API key
+
+Agent keys are ordinary Kaneo API keys and work with every authenticated API endpoint.
+Send the key as a Bearer token:
+
+```bash
+curl -X GET https://your-kaneo-instance.com/api/task?workspaceId=your-workspace-id \
+  -H "Authorization: Bearer your-agent-api-key" \
+  -H "Content-Type: application/json"
+```
+
+The `x-api-key` header works as well:
+
+```bash
+curl -X GET https://your-kaneo-instance.com/api/task?workspaceId=your-workspace-id \
+  -H "x-api-key: your-agent-api-key"
+```
+
+See [Authentication](/api-reference/authentication) for the full set of API
+authentication options.
+
+### Key expiry
+
+Agent keys expire **90 days** after creation. There is no rotation UI: when a key expires
+or is about to, revoke the agent and create a replacement, then update the secret wherever
+your automation reads it.
+
+## What an agent can do
+
+Every agent is created with the workspace's **member** role. There is no per-agent role
+choice — that keeps a bot from ever being provisioned with admin or owner authority by
+accident.
+
+With the default member permissions, an agent can create and read projects, create, read,
+and update tasks, comment, and manage labels. It cannot change workspace settings, manage
+membership, or delete the workspace. If you have edited your workspace's `member` role,
+agents follow whatever that role currently grants.
+
+A few limits are structural rather than permission-based:
+
+- An agent can never be a workspace owner, and never appears as a candidate when
+  transferring workspace ownership.
+- An agent belongs to exactly one workspace for its whole lifetime. To automate two
+  workspaces, create one agent in each.
+- Roles cannot be changed for an agent row in the members table.
+
+<Note>
+On instances with billing enabled, an agent occupies a workspace seat, the same as a human
+member.
+</Note>
+
+## Revoke an agent
+
+<Steps>
+<Step>
+**Find the agent in the members table**
+
+Open **Members** and locate the row with the **agent** badge.
+</Step>
+
+<Step>
+**Choose Revoke Agent**
+
+Open the row's actions menu and select **Revoke Agent**, then confirm.
+</Step>
+</Steps>
+
+Revoking an agent takes effect immediately:
+
+- its API key is deleted, so the next request made with that key is rejected
+- it is removed from the workspace and loses all access
+
+The agent's past work is deliberately left alone. Tasks it created and comments it wrote
+keep their author, so project history stays readable after the automation is retired.
+Removing an agent through any other path — including the generic member-removal API —
+revokes its key the same way.
+
+## Next
+
+- [Collaborate with your team](/core/functional/collaborate-with-team)
+- [API authentication](/api-reference/authentication)
+- [Kaneo MCP server](/core/integrations/mcp)
