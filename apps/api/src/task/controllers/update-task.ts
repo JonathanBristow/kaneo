@@ -1,7 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import db from "../../database";
-import { columnTable, taskTable } from "../../database/schema";
+import {
+  columnTable,
+  taskRelationTable,
+  taskTable,
+} from "../../database/schema";
 import { publishEvent } from "../../events";
 import { deleteOrphanedAssets } from "../../storage/cleanup-assets";
 import {
@@ -12,6 +16,21 @@ import {
   assertValidTaskStatus,
   assertValidTaskType,
 } from "../validate-task-fields";
+
+async function hasEpicChildren(taskId: string) {
+  const [child] = await db
+    .select({ id: taskRelationTable.id })
+    .from(taskRelationTable)
+    .where(
+      and(
+        eq(taskRelationTable.sourceTaskId, taskId),
+        eq(taskRelationTable.relationType, "epic"),
+      ),
+    )
+    .limit(1);
+
+  return Boolean(child);
+}
 
 async function updateTask(
   id: string,
@@ -35,6 +54,7 @@ async function updateTask(
       id: taskTable.id,
       description: taskTable.description,
       status: taskTable.status,
+      type: taskTable.type,
       projectId: taskTable.projectId,
     })
     .from(taskTable)
@@ -57,6 +77,21 @@ async function updateTask(
 
   if (type !== undefined) {
     assertValidTaskType(type);
+  }
+
+  // Demoting an epic would strand its children: relation creation requires an
+  // epic source, and neither the epic section nor the generic relation list
+  // renders an epic relation hanging off a plain task.
+  if (
+    type !== undefined &&
+    type !== "epic" &&
+    existingTask.type === "epic" &&
+    (await hasEpicChildren(id))
+  ) {
+    throw new HTTPException(400, {
+      message:
+        "Remove this epic's child tasks before changing it back to a task",
+    });
   }
 
   const normalizedUserId = userId?.trim() || undefined;

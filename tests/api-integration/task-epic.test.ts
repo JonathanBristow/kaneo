@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import db, { schema } from "../../apps/api/src/database";
 import { createApp } from "../../apps/api/src/index";
@@ -220,6 +220,178 @@ describe("API integration: epics", () => {
       .from(schema.taskRelationTable)
       .where(eq(schema.taskRelationTable.sourceTaskId, notAnEpic.id));
     expect(persistedRelations).toHaveLength(0);
+  });
+
+  it("rejects an epic relation whose child is in another project", async () => {
+    const member = await createWorkspaceMember();
+    const { project, columns } = await createProjectFixture({
+      workspaceId: member.workspace.id,
+    });
+    const other = await createProjectFixture({
+      workspaceId: member.workspace.id,
+    });
+
+    const [epic] = await db
+      .insert(schema.taskTable)
+      .values({
+        projectId: project.id,
+        title: "Epic",
+        type: "epic",
+        status: "to-do",
+        columnId: columns.todo.id,
+        number: 1,
+        position: 1,
+      })
+      .returning();
+    const [foreignChild] = await db
+      .insert(schema.taskTable)
+      .values({
+        projectId: other.project.id,
+        title: "Child in another project",
+        type: "task",
+        status: "to-do",
+        columnId: other.columns.todo.id,
+        number: 1,
+        position: 1,
+      })
+      .returning();
+
+    mockAuthenticatedSession(member.user);
+    const { app } = createApp();
+
+    const response = await app.request("/api/task-relation", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sourceTaskId: epic.id,
+        targetTaskId: foreignChild.id,
+        relationType: "epic",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  it("refuses to turn an epic with children back into a task", async () => {
+    const member = await createWorkspaceMember();
+    const { project, columns } = await createProjectFixture({
+      workspaceId: member.workspace.id,
+    });
+
+    const [epic] = await db
+      .insert(schema.taskTable)
+      .values({
+        projectId: project.id,
+        title: "Epic",
+        type: "epic",
+        status: "to-do",
+        columnId: columns.todo.id,
+        number: 1,
+        position: 1,
+      })
+      .returning();
+    const [child] = await db
+      .insert(schema.taskTable)
+      .values({
+        projectId: project.id,
+        title: "Child task",
+        type: "task",
+        status: "to-do",
+        columnId: columns.todo.id,
+        number: 2,
+        position: 2,
+      })
+      .returning();
+    await db.insert(schema.taskRelationTable).values({
+      sourceTaskId: epic.id,
+      targetTaskId: child.id,
+      relationType: "epic",
+    });
+
+    mockAuthenticatedSession(member.user);
+    const { app } = createApp();
+
+    const response = await app.request(`/api/task/${epic.id}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Epic",
+        description: "",
+        status: "to-do",
+        priority: "low",
+        projectId: project.id,
+        position: 1,
+        type: "task",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+
+    const persistedTask = await db.query.taskTable.findFirst({
+      where: eq(schema.taskTable.id, epic.id),
+    });
+    expect(persistedTask?.type).toBe("epic");
+  });
+
+  it("round-trips a task's type through export and import", async () => {
+    const member = await createWorkspaceMember();
+    const { project, columns } = await createProjectFixture({
+      workspaceId: member.workspace.id,
+    });
+
+    await db.insert(schema.taskTable).values([
+      {
+        projectId: project.id,
+        title: "An epic",
+        type: "epic",
+        status: "to-do",
+        columnId: columns.todo.id,
+        number: 1,
+        position: 1,
+      },
+      {
+        projectId: project.id,
+        title: "A task",
+        type: "task",
+        status: "to-do",
+        columnId: columns.todo.id,
+        number: 2,
+        position: 2,
+      },
+    ]);
+
+    mockAuthenticatedSession(member.user);
+    const { app } = createApp();
+
+    const exportResponse = await app.request(`/api/task/export/${project.id}`);
+    expect(exportResponse.status).toBe(200);
+    const exported = (await exportResponse.json()) as {
+      tasks: { title: string; type: string }[];
+    };
+    expect(exported.tasks.find((task) => task.title === "An epic")?.type).toBe(
+      "epic",
+    );
+
+    const destination = await createProjectFixture({
+      workspaceId: member.workspace.id,
+    });
+    const importResponse = await app.request(
+      `/api/task/import/${destination.project.id}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tasks: exported.tasks }),
+      },
+    );
+    expect(importResponse.status).toBe(200);
+
+    const importedEpic = await db.query.taskTable.findFirst({
+      where: and(
+        eq(schema.taskTable.projectId, destination.project.id),
+        eq(schema.taskTable.title, "An epic"),
+      ),
+    });
+    expect(importedEpic?.type).toBe("epic");
   });
 
   it("lists only epic-type tasks when filtering the project's tasks by type", async () => {

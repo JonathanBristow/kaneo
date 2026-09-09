@@ -76,6 +76,18 @@ async function createTaskRelation({
     throw new HTTPException(404, { message: "Target task not found" });
   }
 
+  // The epic UI builds every child link from the epic's own project id, and the
+  // backlog epic filter only ever sees one project's tasks, so a cross-project
+  // child would render links into the wrong project.
+  if (
+    relationType === "epic" &&
+    targetTask.projectId !== sourceTask.projectId
+  ) {
+    throw new HTTPException(400, {
+      message: "An epic and its child task must be in the same project",
+    });
+  }
+
   const existing = await db
     .select({ id: taskRelationTable.id })
     .from(taskRelationTable)

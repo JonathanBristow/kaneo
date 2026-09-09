@@ -82,6 +82,7 @@ async function exportTasks(projectId: string) {
     tasks: tasks.map((task) => ({
       title: task.title,
       description: task.description || "",
+      type: task.type,
       status: task.status,
       priority: task.priority || "low",
       dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : null,
