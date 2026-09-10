@@ -56,7 +56,13 @@ export async function resolveTrialEndsAt(
       return new Date(earlier.trialEndsAt);
     }
 
-    return claimTrial(owner.email);
+    // A workspace owner is always human -- agents are created with a fixed
+    // "member" role and can never hold "owner" (see AGENT_ROLE in
+    // apps/api/src/agent/controllers/create-agent.ts) -- so email is
+    // guaranteed non-null here even though the column itself is nullable.
+    if (owner.email) {
+      return claimTrial(owner.email);
+    }
   }
 
   return new Date(Date.now() + trialDays() * 24 * 60 * 60 * 1000);

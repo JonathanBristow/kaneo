@@ -2,6 +2,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   customType,
   foreignKey,
   index,
@@ -20,28 +21,50 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   },
 });
 
-export const userTable = pgTable("user", {
-  id: text("id")
-    .$defaultFn(() => createId())
-    .primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified")
-    .$defaultFn(() => false)
-    .notNull(),
-  image: text("image"),
-  locale: text("locale"),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" })
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-  isAnonymous: boolean("is_anonymous").default(false),
-  role: text("role"),
-  banned: boolean("banned").default(false),
-  banReason: text("ban_reason"),
-  banExpires: timestamp("ban_expires", { mode: "date" }),
-});
+export const userTable = pgTable(
+  "user",
+  {
+    id: text("id")
+      .$defaultFn(() => createId())
+      .primaryKey(),
+    name: text("name").notNull(),
+    // Nullable so agent rows (isAgent: true) don't need one -- they never
+    // sign in, so there's nothing an email would identify them to. The
+    // check constraint below still requires it for every real (human) row.
+    email: text("email").unique(),
+    emailVerified: boolean("email_verified")
+      .$defaultFn(() => false)
+      .notNull(),
+    image: text("image"),
+    locale: text("locale"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    isAnonymous: boolean("is_anonymous").default(false),
+    // Non-human workspace member (see apps/api/src/agent). Always inserted
+    // directly by that feature's own controllers, never through a Better Auth
+    // sign-up path, so it deliberately is NOT registered as a
+    // `user.additionalFields` entry in auth.ts: the organization plugin's own
+    // member-listing endpoints (listMembers/getFullOrganization) hard-code a
+    // narrow `{id,name,email,image}` projection regardless of additionalFields,
+    // so registering it would not surface it there anyway. Read/write it via
+    // direct drizzle queries.
+    isAgent: boolean("is_agent").notNull().default(false),
+    role: text("role"),
+    banned: boolean("banned").default(false),
+    banReason: text("ban_reason"),
+    banExpires: timestamp("ban_expires", { mode: "date" }),
+  },
+  (table) => [
+    index("user_isAgent_idx").on(table.isAgent),
+    check(
+      "user_email_required_for_humans",
+      sql`${table.isAgent} = true OR ${table.email} IS NOT NULL`,
+    ),
+  ],
+);
 
 export const sessionTable = pgTable(
   "session",

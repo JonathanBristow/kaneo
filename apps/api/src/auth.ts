@@ -478,6 +478,31 @@ export const auth = betterAuth({
               console.error("Seat sync after member remove failed:", error);
             });
           }
+          if (member?.userId) {
+            // Safety net: this fires on EVERY path that removes a member,
+            // including calling organization.removeMember directly (bypassing
+            // apps/api/src/agent's own DELETE /api/agent/:id). Without this,
+            // removing an agent's membership through the generic path would
+            // leave its API key live and usable forever. Awaited, not
+            // fire-and-forget like the seat sync above -- key revocation is
+            // the security-critical action here.
+            const [removedUser] = await db
+              .select({ isAgent: schema.userTable.isAgent })
+              .from(schema.userTable)
+              .where(eq(schema.userTable.id, member.userId));
+            if (removedUser?.isAgent) {
+              await db
+                .delete(schema.apikeyTable)
+                .where(eq(schema.apikeyTable.referenceId, member.userId));
+              console.log(
+                "Revoked API key(s) for agent removed via organization.removeMember",
+                {
+                  agentUserId: member.userId,
+                  workspaceId: member.organizationId,
+                },
+              );
+            }
+          }
         },
       },
       async sendInvitationEmail(data) {

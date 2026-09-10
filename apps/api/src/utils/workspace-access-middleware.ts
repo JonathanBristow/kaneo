@@ -18,7 +18,8 @@ type WorkspaceIdSource =
         | "activity"
         | "comment"
         | "column"
-        | "workflowRule";
+        | "workflowRule"
+        | "agentMember";
       idKey: string;
     }
   | {
@@ -137,11 +138,35 @@ async function lookupWorkspaceId(
     | "activity"
     | "comment"
     | "column"
-    | "workflowRule",
+    | "workflowRule"
+    | "agentMember",
   id: string,
 ): Promise<string | null> {
   try {
     switch (resource) {
+      case "agentMember": {
+        // Filtering on isAgent here isn't just scoping: it stops the {id}
+        // path param of DELETE /agent/:id from ever resolving a workspace
+        // through an ordinary human member's row, which would otherwise let
+        // an agent-management permission double as a way to remove a
+        // teammate.
+        const [membership] = await db
+          .select({ workspaceId: schema.workspaceUserTable.workspaceId })
+          .from(schema.workspaceUserTable)
+          .innerJoin(
+            schema.userTable,
+            eq(schema.workspaceUserTable.userId, schema.userTable.id),
+          )
+          .where(
+            and(
+              eq(schema.workspaceUserTable.userId, id),
+              eq(schema.userTable.isAgent, true),
+            ),
+          )
+          .limit(1);
+        return membership?.workspaceId || null;
+      }
+
       case "project": {
         const [project] = await db
           .select({ workspaceId: schema.projectTable.workspaceId })
@@ -356,6 +381,14 @@ export const workspaceAccess = {
     workspaceAccessMiddleware({
       sources: [
         { type: "lookup", resource: "workflowRule", idKey },
+        { type: "query", key: "workspaceId" },
+      ],
+    }),
+
+  fromAgentMember: (idKey = "id") =>
+    workspaceAccessMiddleware({
+      sources: [
+        { type: "lookup", resource: "agentMember", idKey },
         { type: "query", key: "workspaceId" },
       ],
     }),

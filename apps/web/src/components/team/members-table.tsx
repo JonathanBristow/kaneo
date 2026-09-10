@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import useDeleteAgent from "@/hooks/mutations/agent/use-delete-agent";
 import useCancelInvitation from "@/hooks/mutations/workspace-user/use-cancel-invitation";
 import useDeleteWorkspaceUser from "@/hooks/mutations/workspace-user/use-delete-workspace-user";
 import useUpdateWorkspaceUserRole from "@/hooks/mutations/workspace-user/use-update-workspace-user-role";
@@ -56,7 +57,27 @@ type Props = {
   workspaceId: string;
   invitations: WorkspaceUserInvitation[];
   users: WorkspaceUser[];
+  // better-auth's organization plugin hard-codes {id,name,email,image} for
+  // the joined `user` object on every member-listing endpoint, so `isAgent`
+  // never reaches `users` here regardless of the schema column existing.
+  // The agent badge instead cross-references this id set from GET /agent.
+  // Optional because that endpoint is admin-only: see isAgentMember for the
+  // signal used when it isn't available.
+  agentUserIds?: Set<string>;
 };
+
+// GET /agent is gated on workspace:manage_settings, so `agentUserIds` is
+// missing for anyone who can't manage the workspace. A missing email is the
+// signal that still holds for them: the API's user_email_required_for_humans
+// check constraint guarantees every human row has one, and agents are created
+// with none. Without this fallback an agent row would fall through to the
+// human remove-member path, which addresses members by email.
+function isAgentMember(
+  member: WorkspaceUser,
+  agentUserIds?: Set<string>,
+): boolean {
+  return (agentUserIds?.has(member.userId) ?? false) || !member.user.email;
+}
 
 // Stable per-user pastel for the avatar fallback. Picks one of a curated set
 // of Tailwind tone pairs from a cheap string hash so the same user keeps the
@@ -90,7 +111,12 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function MembersTable({ workspaceId, invitations, users }: Props) {
+function MembersTable({
+  workspaceId,
+  invitations,
+  users,
+  agentUserIds,
+}: Props) {
   const { t } = useTranslation();
   const [memberToDelete, setMemberToDelete] = useState<WorkspaceUser | null>(
     null,
@@ -101,16 +127,28 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
   const { user: currentUser } = useAuth();
   const { mutateAsync: deleteWorkspaceUser, isPending: isDeleting } =
     useDeleteWorkspaceUser();
+  const { mutateAsync: deleteAgent, isPending: isRevoking } =
+    useDeleteAgent(workspaceId);
   const { mutateAsync: cancelInvitation, isPending: isCancelling } =
     useCancelInvitation();
   const { mutateAsync: updateMemberRole } = useUpdateWorkspaceUserRole();
   const { copy: copyInvitationLink } = useCopyInvitationLink();
   const { data: allWorkspaceRoles = [] } = useWorkspaceRoles(workspaceId);
-  const { canManageTeam, canRemoveMembers, canInviteUsers } =
-    useWorkspacePermission();
+  const {
+    canManageTeam,
+    canRemoveMembers,
+    canInviteUsers,
+    canManageWorkspace,
+  } = useWorkspacePermission();
   const canChangeRoles = Boolean(canManageTeam());
   const canRemove = Boolean(canRemoveMembers());
   const canInvite = Boolean(canInviteUsers());
+  // Revoking an agent invalidates its API key (see afterRemoveMember in
+  // apps/api/src/auth.ts) -- gate it on the same permission the server
+  // enforces on DELETE /api/agent/:id, not the lighter member:delete a
+  // human removal only needs, so the UI never offers an action the server
+  // will 403.
+  const canRevokeAgent = Boolean(canManageWorkspace());
 
   const customRoles = allWorkspaceRoles.filter(
     (role) => !RESERVED_ROLE_NAMES.has(role.role),
@@ -143,19 +181,32 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
     }
   };
 
+  const memberToDeleteIsAgent = memberToDelete
+    ? isAgentMember(memberToDelete, agentUserIds)
+    : false;
+
   const handleDeleteMember = async () => {
     if (!memberToDelete) return;
     try {
-      await deleteWorkspaceUser({
-        workspaceId,
-        userId: memberToDelete.user.email,
-      });
-      toast.success(t("team:membersTable.removeSuccess"));
+      if (memberToDeleteIsAgent) {
+        await deleteAgent({ id: memberToDelete.userId });
+        toast.success(t("team:membersTable.revokeSuccess"));
+      } else {
+        await deleteWorkspaceUser({
+          workspaceId,
+          userId: memberToDelete.user.email,
+        });
+        toast.success(t("team:membersTable.removeSuccess"));
+      }
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : t("team:membersTable.removeError"),
+          : t(
+              memberToDeleteIsAgent
+                ? "team:membersTable.revokeError"
+                : "team:membersTable.removeError",
+            ),
       );
     } finally {
       setMemberToDelete(null);
@@ -205,11 +256,12 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
         <TableBody>
           {sortedUsers.map((member) => {
             const isSelf = currentUser?.id === member.userId;
+            const isAgent = isAgentMember(member, agentUserIds);
             const showRoleSelect =
-              canChangeRoles && !isSelf && member.role !== "owner";
-            const tone = toneFor(member.user.email);
+              canChangeRoles && !isSelf && !isAgent && member.role !== "owner";
+            const tone = toneFor(member.user.email ?? member.userId);
             return (
-              <TableRow key={member.user.email}>
+              <TableRow key={member.userId}>
                 <TableCell className="ps-6 py-3">
                   <div className="flex items-center gap-3">
                     <Avatar className={cn("size-8", tone)}>
@@ -226,20 +278,41 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
                         <span className="text-sm font-medium">
                           {member.user.name}
                         </span>
+                        {isAgent ? (
+                          <Badge
+                            variant="outline"
+                            size="sm"
+                            className="font-mono text-[9px] uppercase tracking-wider"
+                          >
+                            {t("team:members.agentBadge", {
+                              defaultValue: "agent",
+                            })}
+                          </Badge>
+                        ) : null}
                         {isSelf ? (
                           <span className="text-xs text-muted-foreground">
                             ({t("team:members.you", { defaultValue: "You" })})
                           </span>
                         ) : null}
                       </div>
-                      <div className="truncate text-xs text-muted-foreground">
-                        {member.user.email}
-                      </div>
+                      {/* Agents have no email (userTable.email is null for
+                          them) -- nothing meaningful to show here. */}
+                      {isAgent ? null : (
+                        <div className="truncate text-xs text-muted-foreground">
+                          {member.user.email}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </TableCell>
                 <TableCell className="py-3">
-                  {member.role === "owner" ? (
+                  {isAgent ? (
+                    // Not just hidden from the create flow -- a role isn't a
+                    // concept worth surfacing for an agent row at all, so
+                    // this never falls through to the Owner badge/Select/
+                    // Badge branches below, regardless of the stored value.
+                    <span className="text-sm text-muted-foreground">—</span>
+                  ) : member.role === "owner" ? (
                     <Badge variant="outline" className="gap-1">
                       <ShieldIcon className="size-3" />
                       {t("team:roles.owner", { defaultValue: "Owner" })}
@@ -293,7 +366,7 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
                   {member.createdAt ? formatDateMedium(member.createdAt) : "–"}
                 </TableCell>
                 <TableCell className="pe-6 py-3 text-right">
-                  {!isSelf && canRemove ? (
+                  {!isSelf && (isAgent ? canRevokeAgent : canRemove) ? (
                     <Menu>
                       <MenuTrigger
                         render={
@@ -301,7 +374,11 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-muted-foreground"
-                            aria-label={t("team:membersTable.ariaRemoveMember")}
+                            aria-label={t(
+                              isAgent
+                                ? "team:membersTable.ariaRevokeAgent"
+                                : "team:membersTable.ariaRemoveMember",
+                            )}
                           />
                         }
                       >
@@ -310,7 +387,11 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
                       <MenuPopup align="end">
                         <MenuItem onClick={() => setMemberToDelete(member)}>
                           <TrashIcon className="size-4" />
-                          {t("team:membersTable.removeMember")}
+                          {t(
+                            isAgent
+                              ? "team:membersTable.revokeAgent"
+                              : "team:membersTable.removeMember",
+                          )}
                         </MenuItem>
                       </MenuPopup>
                     </Menu>
@@ -424,19 +505,34 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t("team:membersTable.removeDialogTitle")}
+              {t(
+                memberToDeleteIsAgent
+                  ? "team:membersTable.revokeDialogTitle"
+                  : "team:membersTable.removeDialogTitle",
+              )}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("team:membersTable.removeDialogDescription", {
-                name:
-                  memberToDelete?.user.name || memberToDelete?.user.email || "",
-              })}
+              {t(
+                memberToDeleteIsAgent
+                  ? "team:membersTable.revokeDialogDescription"
+                  : "team:membersTable.removeDialogDescription",
+                {
+                  name:
+                    memberToDelete?.user.name ||
+                    memberToDelete?.user.email ||
+                    "",
+                },
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogClose
               render={
-                <Button variant="outline" size="sm" disabled={isDeleting} />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isDeleting || isRevoking}
+                />
               }
             >
               {t("common:actions.cancel")}
@@ -446,13 +542,17 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
                 <Button
                   variant="destructive"
                   size="sm"
-                  disabled={isDeleting}
+                  disabled={isDeleting || isRevoking}
                   onClick={handleDeleteMember}
                 />
               }
             >
               <TrashIcon className="mr-2 size-4" />
-              {t("team:membersTable.removeMember")}
+              {t(
+                memberToDeleteIsAgent
+                  ? "team:membersTable.revokeAgent"
+                  : "team:membersTable.removeMember",
+              )}
             </AlertDialogClose>
           </AlertDialogFooter>
         </AlertDialogContent>

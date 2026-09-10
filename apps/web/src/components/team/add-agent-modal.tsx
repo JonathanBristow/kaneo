@@ -1,0 +1,213 @@
+import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
+import { Check, Copy } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
+import { z } from "zod/v4";
+import useCreateAgent from "@/hooks/mutations/agent/use-create-agent";
+import { copyToClipboard } from "@/lib/copy-to-clipboard";
+import { toast } from "@/lib/toast";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import { Button } from "../ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "../ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "../ui/form";
+import { Input } from "../ui/input";
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  workspaceId: string;
+};
+
+const agentFormSchema = z.object({
+  name: z.string().trim().min(1),
+});
+
+type AgentFormValues = z.infer<typeof agentFormSchema>;
+
+function AddAgentModal({ open, onClose, workspaceId }: Props) {
+  const { t } = useTranslation();
+  const { mutateAsync, isPending } = useCreateAgent();
+  const [createdAgent, setCreatedAgent] = useState<{
+    name: string;
+    apiKey: string;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
+  // Set when a copy attempt fails outright. The key is only ever shown once,
+  // so the Done button stays locked until it has been secured -- but locking
+  // it on a clipboard that cannot work (denied permission, or an instance
+  // served over plain HTTP with no execCommand fallback either) would trap
+  // someone in the dialog with no way to acknowledge a key they can still
+  // select by hand.
+  const [copyFailed, setCopyFailed] = useState(false);
+
+  const form = useForm<AgentFormValues>({
+    resolver: standardSchemaResolver(agentFormSchema),
+    defaultValues: { name: "" },
+  });
+
+  const onSubmit = async ({ name }: AgentFormValues) => {
+    try {
+      const result = await mutateAsync({ workspaceId, name });
+      setCreatedAgent({ name: result.user.name, apiKey: result.apiKey });
+      form.reset();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : t("team:addAgentModal.error"),
+      );
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!createdAgent) return;
+    // copyToClipboard covers the non-secure-context case navigator.clipboard
+    // does not exist in, and reports whether the text actually landed --
+    // marking the key as copied when it did not would let it be dismissed and
+    // lost for good.
+    const didCopy = await copyToClipboard(createdAgent.apiKey);
+    if (!didCopy) {
+      setCopyFailed(true);
+      toast.error(t("team:addAgentModal.copyError"));
+      return;
+    }
+    setCopied(true);
+    setCopyFailed(false);
+    toast.success(t("team:addAgentModal.toastCopied"));
+  };
+
+  const resetAndClose = () => {
+    setCreatedAgent(null);
+    setCopied(false);
+    setCopyFailed(false);
+    form.reset();
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={resetAndClose}>
+      <DialogPopup className="w-full max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {createdAgent
+              ? t("team:addAgentModal.createdTitle")
+              : t("team:addAgentModal.title")}
+          </DialogTitle>
+        </DialogHeader>
+
+        {createdAgent ? (
+          <>
+            <DialogPanel className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {t("team:addAgentModal.createdDescription", {
+                  name: createdAgent.name,
+                })}
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium">
+                    {t("team:addAgentModal.apiKeyLabel")}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopy}
+                    className="h-7 gap-1.5 text-xs"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-3 w-3 text-success-foreground" />
+                        {t("team:addAgentModal.copied")}
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3 w-3" />
+                        {t("team:addAgentModal.copy")}
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <div className="bg-sidebar border border-border rounded-sm p-2.5 max-h-24 overflow-y-auto">
+                  <code className="text-xs font-mono text-foreground break-all leading-relaxed">
+                    {createdAgent.apiKey}
+                  </code>
+                </div>
+              </div>
+              <Alert>
+                <AlertTitle>{t("team:addAgentModal.alertTitle")}</AlertTitle>
+                <AlertDescription>
+                  {t("team:addAgentModal.alertDescription")}
+                </AlertDescription>
+              </Alert>
+            </DialogPanel>
+            <DialogFooter>
+              <Button
+                size="sm"
+                onClick={resetAndClose}
+                disabled={!copied && !copyFailed}
+                className="w-full sm:w-auto"
+              >
+                {copied || copyFailed
+                  ? t("team:addAgentModal.done")
+                  : t("team:addAgentModal.copyToContinue")}
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
+              <DialogPanel className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("team:addAgentModal.nameLabel")}</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder={t("team:addAgentModal.namePlaceholder")}
+                          autoFocus
+                          disabled={isPending}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </DialogPanel>
+              <DialogFooter>
+                <DialogClose
+                  render={<Button variant="outline" size="sm" type="button" />}
+                >
+                  {t("common:actions.cancel")}
+                </DialogClose>
+                <Button type="submit" size="sm" disabled={isPending}>
+                  {isPending
+                    ? t("team:addAgentModal.creating")
+                    : t("team:addAgentModal.create")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        )}
+      </DialogPopup>
+    </Dialog>
+  );
+}
+
+export default AddAgentModal;

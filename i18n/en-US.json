@@ -2074,6 +2074,8 @@
 		"members": {
 			"pageTitle": "Members",
 			"inviteMember": "Invite member",
+			"addAgent": "Add agent",
+			"agentBadge": "agent",
 			"you": "You"
 		},
 		"invitations": {
@@ -2108,18 +2110,43 @@
 			"ariaCancelInvitation": "Cancel invitation",
 			"ariaInvitationActions": "Invitation actions",
 			"ariaRemoveMember": "Remove member",
+			"ariaRevokeAgent": "Revoke agent",
 			"removeDialogTitle": "Remove Team Member?",
 			"removeDialogDescription": "Are you sure you want to remove {{name}} from the workspace? This action cannot be undone.",
+			"revokeDialogTitle": "Revoke Agent?",
+			"revokeDialogDescription": "Are you sure you want to revoke {{name}}? This invalidates its API key immediately. This action cannot be undone — a new agent would need to be created in its place.",
 			"cancelDialogTitle": "Cancel Invitation?",
 			"cancelDialogDescription": "Are you sure you want to cancel the invitation for {{email}}? This action cannot be undone.",
 			"removeMember": "Remove Member",
+			"revokeAgent": "Revoke Agent",
 			"cancelInvitation": "Cancel Invitation",
 			"removeSuccess": "Team member removed successfully",
 			"removeError": "Failed to remove team member",
+			"revokeSuccess": "Agent revoked successfully",
+			"revokeError": "Failed to revoke agent",
 			"cancelInviteSuccess": "Invitation cancelled successfully",
 			"cancelInviteError": "Failed to cancel invitation",
 			"roleUpdateSuccess": "Role updated",
 			"roleUpdateError": "Failed to update role"
+		},
+		"addAgentModal": {
+			"title": "Add Agent",
+			"nameLabel": "Name",
+			"namePlaceholder": "Release Bot",
+			"create": "Create Agent",
+			"creating": "Creating...",
+			"error": "Failed to create agent",
+			"createdTitle": "Agent created",
+			"createdDescription": "{{name}} was added to the workspace. Copy its API key now — it will not be shown again.",
+			"apiKeyLabel": "API key",
+			"copy": "Copy",
+			"copied": "Copied",
+			"toastCopied": "API key copied",
+			"copyError": "Couldn't copy the key. Select it and copy it manually before closing.",
+			"alertTitle": "Store this key securely",
+			"alertDescription": "This key will not be shown again. If you lose it, revoke this agent and create a new one.",
+			"done": "Done",
+			"copyToContinue": "Copy the key to continue"
 		}
 	},
 	"publicProject": {

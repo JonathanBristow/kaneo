@@ -1,0 +1,1 @@
+CREATE INDEX "user_isAgent_idx" ON "user" USING btree ("is_agent");
