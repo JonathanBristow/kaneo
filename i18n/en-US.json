@@ -2142,6 +2142,7 @@
 			"copy": "Copy",
 			"copied": "Copied",
 			"toastCopied": "API key copied",
+			"copyError": "Couldn't copy the key. Select it and copy it manually before closing.",
 			"alertTitle": "Store this key securely",
 			"alertDescription": "This key will not be shown again. If you lose it, revoke this agent and create a new one.",
 			"done": "Done",

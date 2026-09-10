@@ -61,8 +61,23 @@ type Props = {
   // the joined `user` object on every member-listing endpoint, so `isAgent`
   // never reaches `users` here regardless of the schema column existing.
   // The agent badge instead cross-references this id set from GET /agent.
+  // Optional because that endpoint is admin-only: see isAgentMember for the
+  // signal used when it isn't available.
   agentUserIds?: Set<string>;
 };
+
+// GET /agent is gated on workspace:manage_settings, so `agentUserIds` is
+// missing for anyone who can't manage the workspace. A missing email is the
+// signal that still holds for them: the API's user_email_required_for_humans
+// check constraint guarantees every human row has one, and agents are created
+// with none. Without this fallback an agent row would fall through to the
+// human remove-member path, which addresses members by email.
+function isAgentMember(
+  member: WorkspaceUser,
+  agentUserIds?: Set<string>,
+): boolean {
+  return (agentUserIds?.has(member.userId) ?? false) || !member.user.email;
+}
 
 // Stable per-user pastel for the avatar fallback. Picks one of a curated set
 // of Tailwind tone pairs from a cheap string hash so the same user keeps the
@@ -167,7 +182,7 @@ function MembersTable({
   };
 
   const memberToDeleteIsAgent = memberToDelete
-    ? (agentUserIds?.has(memberToDelete.userId) ?? false)
+    ? isAgentMember(memberToDelete, agentUserIds)
     : false;
 
   const handleDeleteMember = async () => {
@@ -241,7 +256,7 @@ function MembersTable({
         <TableBody>
           {sortedUsers.map((member) => {
             const isSelf = currentUser?.id === member.userId;
-            const isAgent = agentUserIds?.has(member.userId) ?? false;
+            const isAgent = isAgentMember(member, agentUserIds);
             const showRoleSelect =
               canChangeRoles && !isSelf && !isAgent && member.role !== "owner";
             const tone = toneFor(member.user.email ?? member.userId);

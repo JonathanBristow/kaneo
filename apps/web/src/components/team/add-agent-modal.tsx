@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { z } from "zod/v4";
 import useCreateAgent from "@/hooks/mutations/agent/use-create-agent";
+import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { toast } from "@/lib/toast";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Button } from "../ui/button";
@@ -47,6 +48,13 @@ function AddAgentModal({ open, onClose, workspaceId }: Props) {
     apiKey: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  // Set when a copy attempt fails outright. The key is only ever shown once,
+  // so the Done button stays locked until it has been secured -- but locking
+  // it on a clipboard that cannot work (denied permission, or an instance
+  // served over plain HTTP with no execCommand fallback either) would trap
+  // someone in the dialog with no way to acknowledge a key they can still
+  // select by hand.
+  const [copyFailed, setCopyFailed] = useState(false);
 
   const form = useForm<AgentFormValues>({
     resolver: standardSchemaResolver(agentFormSchema),
@@ -65,16 +73,27 @@ function AddAgentModal({ open, onClose, workspaceId }: Props) {
     }
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!createdAgent) return;
-    navigator.clipboard.writeText(createdAgent.apiKey);
+    // copyToClipboard covers the non-secure-context case navigator.clipboard
+    // does not exist in, and reports whether the text actually landed --
+    // marking the key as copied when it did not would let it be dismissed and
+    // lost for good.
+    const didCopy = await copyToClipboard(createdAgent.apiKey);
+    if (!didCopy) {
+      setCopyFailed(true);
+      toast.error(t("team:addAgentModal.copyError"));
+      return;
+    }
     setCopied(true);
+    setCopyFailed(false);
     toast.success(t("team:addAgentModal.toastCopied"));
   };
 
   const resetAndClose = () => {
     setCreatedAgent(null);
     setCopied(false);
+    setCopyFailed(false);
     form.reset();
     onClose();
   };
@@ -139,10 +158,10 @@ function AddAgentModal({ open, onClose, workspaceId }: Props) {
               <Button
                 size="sm"
                 onClick={resetAndClose}
-                disabled={!copied}
+                disabled={!copied && !copyFailed}
                 className="w-full sm:w-auto"
               >
-                {copied
+                {copied || copyFailed
                   ? t("team:addAgentModal.done")
                   : t("team:addAgentModal.copyToContinue")}
               </Button>

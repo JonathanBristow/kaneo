@@ -120,11 +120,6 @@ function RouteComponent() {
   const { data: fullWorkspace } = useGetFullWorkspace({
     workspaceId: workspace?.id,
   });
-  const { data: agents = [] } = useGetAgents(workspace?.id ?? "");
-  const agentUserIds = useMemo(
-    () => new Set(agents.map((agent) => agent.id)),
-    [agents],
-  );
   const { mutateAsync: updateWorkspace } = useUpdateWorkspace();
   const { mutateAsync: deleteWorkspace, isPending: isDeleting } =
     useDeleteWorkspace();
@@ -132,6 +127,15 @@ function RouteComponent() {
     useTransferWorkspaceOwnership();
   const { canManageWorkspace, canDeleteWorkspace, isOwner } =
     useWorkspacePermission();
+  // Only owners and admins can read GET /agent; for anyone else the agent
+  // check below falls back to the missing-email signal.
+  const { data: agents = [] } = useGetAgents(workspace?.id ?? "", {
+    enabled: Boolean(canManageWorkspace()),
+  });
+  const agentUserIds = useMemo(
+    () => new Set(agents.map((agent) => agent.id)),
+    [agents],
+  );
   const canEdit = canManageWorkspace();
   const canDelete = canDeleteWorkspace();
   const workspaceDescription = getWorkspaceDescription(workspace);
@@ -142,11 +146,14 @@ function RouteComponent() {
   // app should ever let someone create.
   const members = fullWorkspace?.members ?? [];
   const currentOwnerMember = members.find((m) => m.role === "owner");
+  // A missing email is the fallback agent signal for viewers who can't read
+  // GET /agent: the API requires one for every human row.
   const eligibleNewOwners = members.filter(
     (m) =>
       m.role !== "owner" &&
       m.userId !== currentUser?.id &&
-      !agentUserIds.has(m.userId),
+      !agentUserIds.has(m.userId) &&
+      Boolean(m.user.email),
   );
   const selectedMember = eligibleNewOwners.find(
     (m) => m.id === selectedNewOwnerId,

@@ -216,7 +216,11 @@ describe("MembersTable agent badge", () => {
     expect(screen.getByText("Jane Human")).toBeVisible();
   });
 
-  it("shows no agent badge when agentUserIds is omitted", () => {
+  it("still badges an email-less row when agentUserIds is omitted", () => {
+    // GET /agent 403s for anyone without workspace:manage_settings, so the
+    // id set is simply absent for them. A member with no email can only be an
+    // agent (the API requires one for every human), and that has to keep
+    // working as the agent signal on its own.
     render(
       <MembersTable
         workspaceId="workspace-1"
@@ -225,7 +229,8 @@ describe("MembersTable agent badge", () => {
       />,
     );
 
-    expect(screen.queryByText("team:members.agentBadge")).toBeNull();
+    expect(screen.getAllByText("team:members.agentBadge")).toHaveLength(1);
+    expect(screen.getByText("jane@example.com")).toBeVisible();
   });
 
   it("shows no email for an agent row, but still shows the human's email", () => {
@@ -322,6 +327,45 @@ describe("MembersTable agent revoke", () => {
       screen.getByRole("button", { name: "team:membersTable.revokeAgent" }),
     );
 
+    await waitFor(() =>
+      expect(deleteAgentMutateAsync).toHaveBeenCalledWith({
+        id: "user-agent-1",
+      }),
+    );
+  });
+
+  it("routes an email-less row through useDeleteAgent even when agentUserIds is unavailable", async () => {
+    const emailLessAgent = {
+      ...agentMember,
+      user: { ...agentMember.user, email: null },
+    } as unknown as WorkspaceUser;
+
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[emailLessAgent]}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "team:membersTable.ariaRevokeAgent",
+      }),
+    );
+
+    fireEvent.click(
+      await screen.findByRole("menuitem", {
+        name: "team:membersTable.revokeAgent",
+      }),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "team:membersTable.revokeAgent" }),
+    );
+
+    // The alternative -- falling through to the human path -- would hand
+    // organization.removeMember a null email.
     await waitFor(() =>
       expect(deleteAgentMutateAsync).toHaveBeenCalledWith({
         id: "user-agent-1",

@@ -8847,6 +8847,9 @@
 						"toastCopied": {
 							"type": "string"
 						},
+						"copyError": {
+							"type": "string"
+						},
 						"alertTitle": {
 							"type": "string"
 						},
@@ -8873,6 +8876,7 @@
 						"copy",
 						"copied",
 						"toastCopied",
+						"copyError",
 						"alertTitle",
 						"alertDescription",
 						"done",

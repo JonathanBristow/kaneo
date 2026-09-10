@@ -22,13 +22,18 @@ function RouteComponent() {
   const { t } = useTranslation();
   const { workspaceId } = Route.useParams();
   const { data: workspace } = useGetFullWorkspace({ workspaceId });
-  const { data: agents = [] } = useGetAgents(workspaceId);
   const { canInviteUsers, canManageWorkspace } = useWorkspacePermission();
   const canInvite = Boolean(canInviteUsers());
   // Gate the trigger the same way the API gates POST /agent
   // (workspace:manage_settings), so the button never promises an action the
   // server will 403.
   const canAddAgent = Boolean(canManageWorkspace());
+  // GET /agent is gated on the same permission, so only fetch it for viewers
+  // who would actually get a list back. Everyone else falls back to the
+  // email-less signal in MembersTable.
+  const { data: agents = [] } = useGetAgents(workspaceId, {
+    enabled: canAddAgent,
+  });
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isAddAgentOpen, setIsAddAgentOpen] = useState(false);
   const agentUserIds = new Set(agents.map((agent) => agent.id));

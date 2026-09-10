@@ -2145,7 +2145,8 @@
 			"nameLabel": "Name",
 			"namePlaceholder": "Release Bot",
 			"title": "Add Agent",
-			"toastCopied": "API key copied"
+			"toastCopied": "API key copied",
+			"copyError": "Couldn't copy the key. Select it and copy it manually before closing."
 		}
 	},
 	"publicProject": {
