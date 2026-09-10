@@ -5,6 +5,7 @@
 **/.turbo
 **/coverage
 **/dist
+**/.cache
 **/node_modules
 .env
 .env.*

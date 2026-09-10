@@ -1,5 +1,5 @@
 {
-	"id": "a32b5a81-7214-4a0a-8fb7-a50eb7ebfe53",
+	"id": "eae2881d-c32d-4b81-88f4-cd494a0f487b",
 	"prevId": "9248c325-fef7-4c63-a54a-6800d29169ec",
 	"version": "7",
 	"dialect": "postgresql",
@@ -2604,13 +2604,6 @@
 					"primaryKey": false,
 					"notNull": false
 				},
-				"type": {
-					"name": "type",
-					"type": "text",
-					"primaryKey": false,
-					"notNull": true,
-					"default": "'task'"
-				},
 				"status": {
 					"name": "status",
 					"type": "text",
@@ -3128,6 +3121,13 @@
 					"type": "boolean",
 					"primaryKey": false,
 					"notNull": false,
+					"default": false
+				},
+				"is_agent": {
+					"name": "is_agent",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": true,
 					"default": false
 				},
 				"role": {

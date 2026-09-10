@@ -2094,7 +2094,9 @@
 		"members": {
 			"pageTitle": "成员",
 			"inviteMember": "邀请成员",
-			"you": "你"
+			"you": "你",
+			"addAgent": "Add agent",
+			"agentBadge": "agent"
 		},
 		"invitations": {
 			"pendingBadge": "待处理",
@@ -2139,7 +2141,32 @@
 			"cancelInviteSuccess": "邀请已取消",
 			"cancelInviteError": "取消邀请失败",
 			"roleUpdateSuccess": "角色已更新",
-			"roleUpdateError": "更新角色失败"
+			"roleUpdateError": "更新角色失败",
+			"ariaRevokeAgent": "Revoke agent",
+			"revokeAgent": "Revoke Agent",
+			"revokeDialogDescription": "Are you sure you want to revoke {{name}}? This invalidates its API key immediately. This action cannot be undone — a new agent would need to be created in its place.",
+			"revokeDialogTitle": "Revoke Agent?",
+			"revokeError": "Failed to revoke agent",
+			"revokeSuccess": "Agent revoked successfully"
+		},
+		"addAgentModal": {
+			"alertDescription": "This key will not be shown again. If you lose it, revoke this agent and create a new one.",
+			"alertTitle": "Store this key securely",
+			"apiKeyLabel": "API key",
+			"copied": "Copied",
+			"copy": "Copy",
+			"copyToContinue": "Copy the key to continue",
+			"create": "Create Agent",
+			"createdDescription": "{{name}} was added to the workspace. Copy its API key now — it will not be shown again.",
+			"createdTitle": "Agent created",
+			"creating": "Creating...",
+			"done": "Done",
+			"error": "Failed to create agent",
+			"nameLabel": "Name",
+			"namePlaceholder": "Release Bot",
+			"title": "Add Agent",
+			"toastCopied": "API key copied",
+			"copyError": "Couldn't copy the key. Select it and copy it manually before closing."
 		}
 	},
 	"publicProject": {

@@ -8699,11 +8699,23 @@
 						"inviteMember": {
 							"type": "string"
 						},
+						"addAgent": {
+							"type": "string"
+						},
+						"agentBadge": {
+							"type": "string"
+						},
 						"you": {
 							"type": "string"
 						}
 					},
-					"required": ["pageTitle", "inviteMember", "you"]
+					"required": [
+						"pageTitle",
+						"inviteMember",
+						"addAgent",
+						"agentBadge",
+						"you"
+					]
 				},
 				"invitations": {
 					"type": "object",
@@ -8822,10 +8834,19 @@
 						"ariaRemoveMember": {
 							"type": "string"
 						},
+						"ariaRevokeAgent": {
+							"type": "string"
+						},
 						"removeDialogTitle": {
 							"type": "string"
 						},
 						"removeDialogDescription": {
+							"type": "string"
+						},
+						"revokeDialogTitle": {
+							"type": "string"
+						},
+						"revokeDialogDescription": {
 							"type": "string"
 						},
 						"cancelDialogTitle": {
@@ -8837,6 +8858,9 @@
 						"removeMember": {
 							"type": "string"
 						},
+						"revokeAgent": {
+							"type": "string"
+						},
 						"cancelInvitation": {
 							"type": "string"
 						},
@@ -8844,6 +8868,12 @@
 							"type": "string"
 						},
 						"removeError": {
+							"type": "string"
+						},
+						"revokeSuccess": {
+							"type": "string"
+						},
+						"revokeError": {
 							"type": "string"
 						},
 						"cancelInviteSuccess": {
@@ -8867,18 +8897,100 @@
 						"ariaCancelInvitation",
 						"ariaInvitationActions",
 						"ariaRemoveMember",
+						"ariaRevokeAgent",
 						"removeDialogTitle",
 						"removeDialogDescription",
+						"revokeDialogTitle",
+						"revokeDialogDescription",
 						"cancelDialogTitle",
 						"cancelDialogDescription",
 						"removeMember",
+						"revokeAgent",
 						"cancelInvitation",
 						"removeSuccess",
 						"removeError",
+						"revokeSuccess",
+						"revokeError",
 						"cancelInviteSuccess",
 						"cancelInviteError",
 						"roleUpdateSuccess",
 						"roleUpdateError"
+					]
+				},
+				"addAgentModal": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"title": {
+							"type": "string"
+						},
+						"nameLabel": {
+							"type": "string"
+						},
+						"namePlaceholder": {
+							"type": "string"
+						},
+						"create": {
+							"type": "string"
+						},
+						"creating": {
+							"type": "string"
+						},
+						"error": {
+							"type": "string"
+						},
+						"createdTitle": {
+							"type": "string"
+						},
+						"createdDescription": {
+							"type": "string"
+						},
+						"apiKeyLabel": {
+							"type": "string"
+						},
+						"copy": {
+							"type": "string"
+						},
+						"copied": {
+							"type": "string"
+						},
+						"toastCopied": {
+							"type": "string"
+						},
+						"copyError": {
+							"type": "string"
+						},
+						"alertTitle": {
+							"type": "string"
+						},
+						"alertDescription": {
+							"type": "string"
+						},
+						"done": {
+							"type": "string"
+						},
+						"copyToContinue": {
+							"type": "string"
+						}
+					},
+					"required": [
+						"title",
+						"nameLabel",
+						"namePlaceholder",
+						"create",
+						"creating",
+						"error",
+						"createdTitle",
+						"createdDescription",
+						"apiKeyLabel",
+						"copy",
+						"copied",
+						"toastCopied",
+						"copyError",
+						"alertTitle",
+						"alertDescription",
+						"done",
+						"copyToContinue"
 					]
 				}
 			},
@@ -8887,7 +8999,8 @@
 				"members",
 				"invitations",
 				"inviteModal",
-				"membersTable"
+				"membersTable",
+				"addAgentModal"
 			]
 		},
 		"publicProject": {
