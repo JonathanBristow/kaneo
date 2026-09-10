@@ -25,6 +25,7 @@ import { getInitials } from "@/lib/get-initials";
 import { getStatusLabel } from "@/lib/i18n/domain";
 import { getPriorityIcon } from "@/lib/priority";
 import { toast } from "@/lib/toast";
+import { useUserPreferencesStore } from "@/store/user-preferences";
 
 type EpicsSearchParams = {
   taskId?: string;
@@ -122,6 +123,7 @@ function RouteComponent() {
   const { data: columns = [] } = useGetColumns(projectId);
   const { data: workspaceUsers } = useGetActiveWorkspaceUsers(workspaceId);
   const createTask = useCreateTask();
+  const setViewMode = useUserPreferencesStore((state) => state.setViewMode);
   const { canCreateTasks } = useWorkspacePermission();
   const canCreate = canCreateTasks();
 
@@ -134,12 +136,14 @@ function RouteComponent() {
     sequentialShortcuts: {
       [shortcuts.view.prefix]: {
         [shortcuts.view.board]: () => {
+          setViewMode("board");
           navigate({
             to: "/dashboard/workspace/$workspaceId/project/$projectId/board",
             params: { workspaceId, projectId },
           });
         },
         [shortcuts.view.list]: () => {
+          setViewMode("list");
           navigate({
             to: "/dashboard/workspace/$workspaceId/project/$projectId/board",
             params: { workspaceId, projectId },

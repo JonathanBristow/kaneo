@@ -66,7 +66,11 @@ describe("API integration: epics", () => {
     });
 
     expect(response.status).toBe(200);
-    const payload = (await response.json()) as { id: string; type: string };
+    const payload = (await response.json()) as {
+      id: string;
+      title: string;
+      type: string;
+    };
     expect(payload).toMatchObject({
       title: "Website redesign",
       type: "epic",
